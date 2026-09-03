@@ -120,12 +120,12 @@ export default function HomePage() {
       <header className="sticky top-0 z-20 border-b border-border bg-background/85 backdrop-blur supports-[backdrop-filter]:bg-background/70">
         <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-3 sm:px-6">
           <div className="flex min-w-0 items-center gap-2.5">
-            <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-foreground text-background">
+            <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-brand text-brand-foreground">
               <Bot className="size-4" aria-hidden />
             </span>
             <div className="min-w-0">
               <h1 className="truncate text-sm font-semibold leading-none tracking-tight">
-                Copilot Session Visualizer
+                Copilot <span className="text-brand">Session</span> Visualizer
               </h1>
               <p className="mt-1 font-mono text-xs text-muted-foreground">
                 ~/.copilot

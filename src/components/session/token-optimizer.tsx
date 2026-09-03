@@ -7,6 +7,7 @@ import {
   Lightbulb,
   TriangleAlert,
 } from "lucide-react";
+import { BarList } from "@/components/common/bar-list";
 import { cn } from "@/lib/utils";
 import type { SessionStats, TokenAnalysis, TokenHint } from "./types";
 
@@ -36,10 +37,12 @@ const SEVERITY_ORDER = ["high", "medium", "low"] as const;
 export function TokenOptimizer({
   analysis,
   stats,
+  eventTypeCounts,
   onFocusHint,
 }: {
   analysis: TokenAnalysis;
   stats: SessionStats;
+  eventTypeCounts: { name: string; value: number }[];
   onFocusHint: (focus: NonNullable<TokenHint["focus"]>) => void;
 }) {
   const breakdown = [
@@ -137,25 +140,6 @@ export function TokenOptimizer({
           </>
         )}
 
-        {analysis.topToolsByCount.length > 0 && (
-          <div className="mt-5">
-            <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Top tool calls
-            </h3>
-            <div className="flex flex-wrap gap-1.5">
-              {analysis.topToolsByCount.map(({ name, count }) => (
-                <span
-                  key={name}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-muted px-2.5 py-1 text-xs"
-                >
-                  <span className="font-mono font-medium text-foreground">{name}</span>
-                  <span className="tabular-nums text-muted-foreground">×{count}</span>
-                </span>
-              ))}
-            </div>
-          </div>
-        )}
-
         <div className="mt-5 grid grid-cols-2 gap-3 border-t border-border pt-4 sm:grid-cols-4">
           {[
             {
@@ -185,9 +169,32 @@ export function TokenOptimizer({
         </div>
       </section>
 
+      <section className="grid gap-4 md:grid-cols-2">
+        <div className="rounded-xl border border-border bg-card p-5">
+          <h3 className="mb-3 text-sm font-semibold text-foreground">Tool usage</h3>
+          <BarList
+            items={analysis.topToolsByCount.map(({ name, count }) => ({
+              name,
+              value: count,
+            }))}
+            color="bg-chart-3"
+            emptyLabel="No tool calls recorded."
+          />
+        </div>
+        <div className="rounded-xl border border-border bg-card p-5">
+          <h3 className="mb-3 text-sm font-semibold text-foreground">Event types</h3>
+          <BarList
+            items={eventTypeCounts}
+            color="bg-brand-2"
+            limit={10}
+            emptyLabel="No events recorded."
+          />
+        </div>
+      </section>
+
       <section>
         <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-foreground">
-          <Lightbulb className="size-4 text-amber-500" aria-hidden />
+          <Lightbulb className="size-4 text-brand" aria-hidden />
           Optimization hints
           {sortedHints.length > 0 && (
             <span className="rounded bg-muted px-1.5 text-xs font-normal tabular-nums text-muted-foreground">

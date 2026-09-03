@@ -1,93 +1,47 @@
 "use client";
 
 import {
-  ArrowDownToLine,
-  ArrowUpFromLine,
   CalendarDays,
   Clock,
   Database,
   GitBranch,
-  MessageSquare,
-  Sparkles,
-  Timer,
-  Wrench,
-  Zap,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { CopyButton } from "@/components/common/copy-button";
+import { StatCard, StatCardGrid } from "@/components/common/stat-card";
 import {
   firstLine,
-  formatCount,
   formatDuration,
   formatFullDateTime,
   timeAgo,
 } from "@/lib/format";
 import type { SessionMeta, SessionStats } from "./types";
-import { cn } from "@/lib/utils";
 
-function formatTokenValue(n: number) {
+function tokens(n: number) {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(2)}M`;
   if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
   return n.toLocaleString();
 }
 
-/** One metric in the stats strip. `tone` tints the token-flow tiles. */
-function StatTile({
-  icon: Icon,
-  label,
-  value,
-  hint,
-  tone = "neutral",
-}: {
-  icon: typeof Zap;
-  label: string;
-  value: string;
-  hint?: string;
-  tone?: "neutral" | "input" | "output" | "cache";
-}) {
-  const toneCls = {
-    neutral: "text-foreground",
-    input: "text-blue-600 dark:text-blue-400",
-    output: "text-indigo-600 dark:text-indigo-400",
-    cache: "text-teal-600 dark:text-teal-400",
-  }[tone];
-
-  const tile = (
-    <div className="flex min-w-0 items-center gap-2 rounded-lg border border-border bg-card px-2.5 py-1.5">
-      <Icon className={cn("size-3.5 shrink-0 opacity-70", toneCls)} aria-hidden />
-      <div className="min-w-0">
-        <div className={cn("font-mono text-xs font-semibold tabular-nums", toneCls)}>
-          {value}
-        </div>
-        <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
-          {label}
-        </div>
-      </div>
-    </div>
-  );
-
-  if (!hint) return tile;
-  return (
-    <Tooltip>
-      <TooltipTrigger render={tile} />
-      <TooltipContent>{hint}</TooltipContent>
-    </Tooltip>
-  );
-}
-
 export function SessionHeader({
   meta,
   stats,
+  activeMs,
 }: {
   meta: SessionMeta;
   stats?: SessionStats;
+  /** First-to-last event span. Real working time, unlike created→updated. */
+  activeMs?: number | null;
 }) {
   const rawName = firstLine(meta.name);
   const title = meta.title ?? rawName;
   const subtitle = meta.title ? rawName : undefined;
-  const totalTokens =
-    (stats?.totalInputTokens ?? 0) + (stats?.totalOutputTokens ?? 0);
+
+  const input = stats?.totalInputTokens ?? 0;
+  const output = stats?.totalOutputTokens ?? 0;
+  const cache = stats?.totalCacheReadTokens ?? 0;
+  const total = input + output + cache;
 
   return (
     <div className="border-b border-border bg-card/40">
@@ -159,78 +113,65 @@ export function SessionHeader({
           )}
         </div>
 
-        {/* Stats strip */}
         {stats && (
-          <div className="mt-4 flex flex-wrap gap-2">
-            {stats.totalInputTokens > 0 && (
-              <StatTile
-                icon={ArrowUpFromLine}
-                tone="input"
-                label="Input"
-                value={formatTokenValue(stats.totalInputTokens)}
-                hint={`${stats.totalInputTokens.toLocaleString()} input tokens`}
+          <div className="mt-4">
+            <StatCardGrid>
+              <StatCard
+                label="Events"
+                value={stats.eventCount.toLocaleString()}
+                sub="recorded in session"
               />
-            )}
-            {stats.totalOutputTokens > 0 && (
-              <StatTile
-                icon={ArrowDownToLine}
-                tone="output"
-                label="Output"
-                value={formatTokenValue(stats.totalOutputTokens)}
-                hint={`${stats.totalOutputTokens.toLocaleString()} output tokens`}
+              <StatCard
+                label="Messages"
+                value={(
+                  stats.totalUserMessages + stats.totalAssistantMessages
+                ).toLocaleString()}
+                sub={`${stats.totalUserMessages} user · ${stats.totalAssistantMessages} assistant`}
               />
-            )}
-            {stats.totalCacheReadTokens > 0 && (
-              <StatTile
-                icon={Database}
-                tone="cache"
-                label="Cache read"
-                value={formatTokenValue(stats.totalCacheReadTokens)}
-                hint={`${stats.totalCacheReadTokens.toLocaleString()} tokens read from cache`}
-              />
-            )}
-            {totalTokens > 0 && (
-              <StatTile
-                icon={Zap}
-                label="Total"
-                value={formatTokenValue(totalTokens)}
-                hint="Input + output tokens"
-              />
-            )}
-            {stats.totalUserMessages > 0 && (
-              <StatTile
-                icon={MessageSquare}
-                label="Turns"
-                value={formatCount(stats.totalUserMessages)}
-              />
-            )}
-            {stats.totalToolCalls > 0 && (
-              <StatTile
-                icon={Wrench}
+              <StatCard
                 label="Tool calls"
-                value={formatCount(stats.totalToolCalls)}
+                value={stats.totalToolCalls.toLocaleString()}
+                sub="local + external"
               />
-            )}
-            {stats.totalPremiumRequests > 0 && (
-              <StatTile
-                icon={Sparkles}
-                label="Premium req"
-                value={String(stats.totalPremiumRequests)}
+              <StatCard
+                label="Total tokens"
+                value={total > 0 ? tokens(total) : "—"}
+                sub="in + out + cache"
+                accent
               />
-            )}
-            {stats.totalApiDurationMs > 0 && (
-              <StatTile
-                icon={Timer}
-                label="API time"
-                value={formatDuration(stats.totalApiDurationMs)}
-                hint="Cumulative time spent waiting on the model API"
-              />
-            )}
-            <StatTile
-              icon={Zap}
-              label="Events"
-              value={formatCount(stats.eventCount)}
-            />
+              {/* Only surface the token buckets the session actually reported —
+                  empty "—" cards are noise. */}
+              {input > 0 && (
+                <StatCard label="Input tokens" value={tokens(input)} sub="fresh input" />
+              )}
+              {output > 0 && (
+                <StatCard label="Output tokens" value={tokens(output)} sub="generated" />
+              )}
+              {cache > 0 && (
+                <StatCard label="Cache reads" value={tokens(cache)} sub="reused context" />
+              )}
+              {stats.totalPremiumRequests > 0 && (
+                <StatCard
+                  label="Premium req"
+                  value={stats.totalPremiumRequests.toLocaleString()}
+                  sub="billed requests"
+                />
+              )}
+              {stats.totalApiDurationMs > 0 && (
+                <StatCard
+                  label="API time"
+                  value={formatDuration(stats.totalApiDurationMs)}
+                  sub="waiting on the model"
+                />
+              )}
+              {activeMs != null && activeMs > 0 && (
+                <StatCard
+                  label="Time span"
+                  value={formatDuration(activeMs)}
+                  sub="first to last event"
+                />
+              )}
+            </StatCardGrid>
           </div>
         )}
       </div>

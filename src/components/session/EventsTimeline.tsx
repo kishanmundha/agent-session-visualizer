@@ -4,6 +4,9 @@ import { useState, useMemo, useEffect } from "react";
 import {
   Braces,
   ChevronDown,
+  ChevronRight,
+  ChevronsDownUp,
+  ChevronsUpDown,
   Filter,
   Info,
   ListFilter,
@@ -188,6 +191,7 @@ const DEFAULT_CONFIG = {
   dotCls: "bg-muted border-border",
   cardCls: "bg-muted border-border",
   typeCls: "text-muted-foreground",
+  chipCls: "border-border bg-muted text-muted-foreground",
 };
 
 const CATEGORY_VISUAL: Record<string, { dotCls: string; cardCls: string; typeCls: string; chipCls: string }> = {
@@ -961,11 +965,238 @@ function GenericDataCard({ data }: { data: Record<string, unknown> }) {
   );
 }
 
-function EventCard({ event, prevTimestamp }: { event: CopilotEvent; prevTimestamp?: string }) {
+/** Collapse whitespace and clip to a single scannable line. */
+function shorten(value: unknown, max = 150) {
+  const text = String(value ?? "").replace(/\s+/g, " ").trim();
+  return text.length > max ? `${text.slice(0, max)}…` : text;
+}
+
+/** The argument most worth showing for a tool call, mirroring the CLI's own bias. */
+function firstArg(input?: Record<string, unknown>) {
+  if (!input) return "";
+  for (const key of [
+    "command",
+    "filePath",
+    "file_path",
+    "path",
+    "pattern",
+    "query",
+    "description",
+    "url",
+    "prompt",
+  ]) {
+    if (input[key]) return `${key}: ${shorten(input[key], 90)}`;
+  }
+  const keys = Object.keys(input);
+  return keys.length ? shorten(JSON.stringify(input), 90) : "(no args)";
+}
+
+/**
+ * One-line description of an event, so the timeline can stay collapsed by
+ * default and still be readable at a glance.
+ */
+function eventSummary(event: CopilotEvent): { label: string; preview: string } {
+  const d = event.data;
+  const fallback = EVENT_CONFIG[event.type]?.label ?? splitEventType(event.type).subCategory;
+
+  switch (event.type) {
+    case "user.message":
+      return { label: "User", preview: shorten(d.content) };
+    case "assistant.message": {
+      const toolRequests = (d.toolRequests as { name?: string }[]) ?? [];
+      const content = shorten(d.content);
+      if (content) return { label: "Assistant", preview: content };
+      if (toolRequests.length) {
+        return {
+          label: "Assistant",
+          preview: `requests ${toolRequests.map((t) => t.name).filter(Boolean).join(", ")}`,
+        };
+      }
+      return { label: "Assistant", preview: "(no text)" };
+    }
+    case "assistant.turn_start":
+    case "assistant.turn_end": {
+      const turn = d.turnId;
+      return {
+        label: event.type === "assistant.turn_start" ? "Turn start" : "Turn end",
+        preview: [turn !== undefined ? `turn ${turn}` : "", d.model as string]
+          .filter(Boolean)
+          .join(" · "),
+      };
+    }
+    case "tool.execution_start":
+      return {
+        label: (d.toolName as string) || "Tool",
+        preview: firstArg(d.arguments as Record<string, unknown> | undefined),
+      };
+    case "tool.execution_complete":
+      return {
+        label: (d.toolName as string) || "Tool",
+        preview: d.success === false ? "failed" : "completed",
+      };
+    case "external_tool.requested":
+    case "external_tool.completed":
+      return {
+        label: (d.toolName as string) || "External tool",
+        preview:
+          event.type === "external_tool.requested"
+            ? firstArg(d.arguments as Record<string, unknown> | undefined)
+            : "completed",
+      };
+    case "session.start":
+    case "session.resume": {
+      const ctx = d.context as Record<string, unknown> | undefined;
+      return {
+        label: event.type === "session.start" ? "Session start" : "Session resume",
+        preview: [
+          ctx?.branch ? `branch ${ctx.branch}` : "",
+          d.selectedModel ? `model ${d.selectedModel}` : "",
+        ]
+          .filter(Boolean)
+          .join(" · "),
+      };
+    }
+    case "session.shutdown":
+      return {
+        label: "Shutdown",
+        preview: [
+          d.shutdownType as string,
+          d.totalPremiumRequests !== undefined
+            ? `${d.totalPremiumRequests} premium req`
+            : "",
+        ]
+          .filter(Boolean)
+          .join(" · "),
+      };
+    case "session.auto_mode_resolved":
+      return {
+        label: "Auto mode",
+        preview: [
+          d.chosenModel as string,
+          d.predictedLabel ? `label ${d.predictedLabel}` : "",
+        ]
+          .filter(Boolean)
+          .join(" · "),
+      };
+    case "session.binary_asset":
+      return {
+        label: "Binary asset",
+        preview: [
+          d.mimeType as string,
+          typeof d.byteLength === "number"
+            ? `${(d.byteLength / 1024).toFixed(0)} KB`
+            : "",
+        ]
+          .filter(Boolean)
+          .join(" · "),
+      };
+    case "session.usage_checkpoint":
+      return {
+        label: "Usage checkpoint",
+        preview:
+          d.totalPremiumRequests !== undefined
+            ? `${d.totalPremiumRequests} premium req`
+            : "usage snapshot",
+      };
+    case "session.model_change":
+      return {
+        label: "Model change",
+        preview: `${d.previousModel ?? "unknown"} → ${d.newModel ?? "unknown"}`,
+      };
+    case "session.compaction_start":
+      return { label: "Compaction", preview: `started · ${d.model ?? ""}`.trim() };
+    case "session.compaction_complete":
+      return {
+        label: "Compaction",
+        preview: d.success ? "completed" : `failed${d.error ? `: ${shorten(d.error, 80)}` : ""}`,
+      };
+    case "system.message": {
+      const content = String(d.content ?? "");
+      return {
+        label: "System",
+        preview: `${d.role ?? "system"} · ${content.length.toLocaleString()} chars`,
+      };
+    }
+    case "hook.start":
+    case "hook.end": {
+      const input = d.input as Record<string, unknown> | undefined;
+      if (event.type === "hook.end") {
+        return {
+          label: (d.hookType as string) || "Hook",
+          preview: d.success === false ? "failed" : "success",
+        };
+      }
+      return {
+        label: (d.hookType as string) || "Hook",
+        preview: shorten(input?.prompt, 90) || "started",
+      };
+    }
+    case "permission.requested": {
+      const pr = d.permissionRequest as Record<string, unknown> | undefined;
+      return {
+        label: "Permission",
+        preview: [pr?.kind as string, shorten(pr?.intention, 90)]
+          .filter(Boolean)
+          .join(" · "),
+      };
+    }
+    case "permission.completed": {
+      const res = d.result as Record<string, unknown> | undefined;
+      return { label: "Permission", preview: (res?.kind as string) ?? "resolved" };
+    }
+    case "subagent.deselected":
+      return { label: "Subagent", preview: "focus returned to main agent" };
+    default:
+      return { label: fallback, preview: shorten(JSON.stringify(d), 90) };
+  }
+}
+
+/** Token counts to show inline on a collapsed row, if the event reports any. */
+function eventTokenBadge(event: CopilotEvent): { input: number; output: number } | null {
+  const d = event.data;
+  const details = d.tokenDetails as Record<string, { tokenCount?: number }> | undefined;
+  const input =
+    (typeof d.inputTokens === "number" ? d.inputTokens : 0) ||
+    (details?.input?.tokenCount ?? 0);
+  const output =
+    (typeof d.outputTokens === "number" ? d.outputTokens : 0) ||
+    (details?.output?.tokenCount ?? 0);
+  if (input === 0 && output === 0) return null;
+  return { input, output };
+}
+
+/** Conversation turns read best already open; the machinery starts collapsed. */
+const DEFAULT_OPEN_TYPES = new Set(["user.message", "assistant.message"]);
+
+function EventCard({
+  event,
+  prevTimestamp,
+  expandAll,
+}: {
+  event: CopilotEvent;
+  prevTimestamp?: string;
+  /** Bumped by the toolbar; `open` forces every row open, `closed` closes them. */
+  expandAll: { nonce: number; mode: "open" | "closed" } | null;
+}) {
   const cfg = EVENT_CONFIG[event.type] || DEFAULT_CONFIG;
   const gap = prevTimestamp ? durationMs(prevTimestamp, event.timestamp) : null;
   const [showRaw, setShowRaw] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
+
+  // Local open state, re-seeded whenever the toolbar issues a new expand/collapse.
+  const [openState, setOpenState] = useState({
+    nonce: 0,
+    open: DEFAULT_OPEN_TYPES.has(event.type),
+  });
+  const open =
+    expandAll && expandAll.nonce !== openState.nonce
+      ? expandAll.mode === "open"
+      : openState.open;
+  const setOpen = (next: boolean) =>
+    setOpenState({ nonce: expandAll?.nonce ?? 0, open: next });
+
+  const summary = eventSummary(event);
+  const tokenBadge = eventTokenBadge(event);
   const typeParts = splitEventType(event.type);
   const categoryVisual = CATEGORY_VISUAL[typeParts.category];
   const visual = categoryVisual ?? cfg;
@@ -1054,111 +1285,149 @@ function EventCard({ event, prevTimestamp }: { event: CopilotEvent; prevTimestam
 
   const content = renderContent();
   const rawJson = JSON.stringify(event, null, 2);
+  const hasBody = Boolean(content);
 
   return (
-    <div className="group/event flex gap-3">
-      <div className="flex flex-col items-center">
-        <div
-          className={`flex size-8 shrink-0 items-center justify-center rounded-full border text-sm ${visual.dotCls}`}
+    <div className="group/event relative border-l-2 border-border pb-1 pl-6 last:border-l-transparent">
+      {/* Dot straddles the rail, as in the reference timeline. */}
+      <span
+        className={`absolute -left-[7px] top-2.5 size-3 rounded-full border-2 border-background ${visual.dotCls}`}
+        aria-hidden
+      />
+
+      <div className="flex items-center gap-2 rounded-lg border border-border bg-card px-2.5 py-1.5 transition-colors hover:bg-muted/60">
+        <button
+          type="button"
+          onClick={() => hasBody && setOpen(!open)}
+          aria-expanded={hasBody ? open : undefined}
+          disabled={!hasBody}
+          className="flex min-w-0 flex-1 items-center gap-2 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:cursor-default"
         >
-          {cfg.icon}
+          <ChevronRight
+            className={cn(
+              "size-3.5 shrink-0 text-muted-foreground transition-transform",
+              open && "rotate-90",
+              !hasBody && "opacity-0",
+            )}
+            aria-hidden
+          />
+          <span
+            className={`max-w-[9rem] shrink-0 truncate rounded px-1.5 py-0.5 font-mono text-[11px] font-semibold ${visual.chipCls ?? cfg.typeCls}`}
+            title={summary.label}
+          >
+            {summary.label}
+          </span>
+          <span className="min-w-0 flex-1 truncate text-xs text-foreground/90">
+            {summary.preview}
+          </span>
+        </button>
+
+        {tokenBadge && (
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <span className="hidden shrink-0 font-mono text-[11px] tabular-nums text-muted-foreground sm:inline">
+                  {tokenBadge.input > 0 && `↓${formatCompactNumber(tokenBadge.input)}`}
+                  {tokenBadge.input > 0 && tokenBadge.output > 0 && " "}
+                  {tokenBadge.output > 0 && `↑${formatCompactNumber(tokenBadge.output)}`}
+                </span>
+              }
+            />
+            <TooltipContent>
+              {tokenBadge.input.toLocaleString()} in · {tokenBadge.output.toLocaleString()} out
+            </TooltipContent>
+          </Tooltip>
+        )}
+
+        {gap !== null && gap > 5000 && (
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <span className="hidden shrink-0 rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] tabular-nums text-muted-foreground sm:inline">
+                  +{gap > 60000 ? `${(gap / 60000).toFixed(1)}m` : `${(gap / 1000).toFixed(1)}s`}
+                </span>
+              }
+            />
+            <TooltipContent>Gap since the previous event</TooltipContent>
+          </Tooltip>
+        )}
+
+        <span className="shrink-0 font-mono text-[11px] tabular-nums text-muted-foreground">
+          {formatTime(event.timestamp)}
+        </span>
+
+        {/* Row actions stay out of the way until the row is hovered or focused. */}
+        <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity focus-within:opacity-100 group-hover/event:opacity-100 max-sm:opacity-100">
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <button
+                  type="button"
+                  onClick={() => setShowHelp(!showHelp)}
+                  aria-expanded={showHelp}
+                  aria-label="Explain this event type"
+                  className={cn(
+                    "inline-flex size-6 items-center justify-center rounded-md transition-colors",
+                    "focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring",
+                    showHelp
+                      ? "bg-muted text-foreground"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                  )}
+                >
+                  <Info className="size-3.5" aria-hidden />
+                </button>
+              }
+            />
+            <TooltipContent>What is {event.type}?</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowRaw(!showRaw);
+                    if (!showRaw) setOpen(true);
+                  }}
+                  aria-expanded={showRaw}
+                  aria-label="Toggle raw event JSON"
+                  className={cn(
+                    "inline-flex size-6 items-center justify-center rounded-md transition-colors",
+                    "focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring",
+                    showRaw
+                      ? "bg-muted text-foreground"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                  )}
+                >
+                  <Braces className="size-3.5" aria-hidden />
+                </button>
+              }
+            />
+            <TooltipContent>{showRaw ? "Hide raw JSON" : "Show raw JSON"}</TooltipContent>
+          </Tooltip>
+          <CopyButton value={rawJson} label="Copy raw JSON" className="size-6 justify-center p-0" />
         </div>
-        <div className="mt-1 w-px flex-1 bg-border" />
       </div>
 
-      <div className="min-w-0 flex-1 pb-4">
-        <div className="mb-1 flex items-center gap-2">
-          <span className={`font-mono text-xs font-semibold ${visual.typeCls}`}>
-            {typeParts.category}
-          </span>
-          <span className="rounded border border-border bg-background px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground">
-            {typeParts.subCategory}
-          </span>
-          {gap !== null && gap > 5000 && (
-            <Tooltip>
-              <TooltipTrigger
-                render={
-                  <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] tabular-nums text-muted-foreground">
-                    +{gap > 60000 ? `${(gap / 60000).toFixed(1)}m` : `${(gap / 1000).toFixed(1)}s`}
-                  </span>
-                }
-              />
-              <TooltipContent>Gap since the previous event</TooltipContent>
-            </Tooltip>
+      {showHelp && (
+        <div className="mt-1.5 rounded-lg border border-border bg-muted/40 px-2.5 py-2 text-xs leading-relaxed text-muted-foreground">
+          <span className="font-mono font-semibold text-foreground">{event.type}</span> — {helpText}
+        </div>
+      )}
+
+      {(open || showRaw) && (
+        <div className="mb-2 mt-1.5">
+          {showRaw ? (
+            <pre className="max-h-64 max-w-full overflow-auto whitespace-pre-wrap break-words rounded-lg border border-border bg-muted p-2.5 font-mono text-xs leading-relaxed text-foreground [overflow-wrap:anywhere]">
+              {rawJson}
+            </pre>
+          ) : content && cfg.cardCls ? (
+            <div className={`rounded-lg border p-3 ${visual.cardCls}`}>{content}</div>
+          ) : (
+            content
           )}
-
-          <span className="ml-auto shrink-0 font-mono text-xs tabular-nums text-muted-foreground">
-            {formatTime(event.timestamp)}
-          </span>
-
-          {/* Row actions stay out of the way until the row is hovered or focused. */}
-          <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity focus-within:opacity-100 group-hover/event:opacity-100 max-sm:opacity-100">
-            <Tooltip>
-              <TooltipTrigger
-                render={
-                  <button
-                    type="button"
-                    onClick={() => setShowHelp(!showHelp)}
-                    aria-expanded={showHelp}
-                    aria-label="Explain this event type"
-                    className={cn(
-                      "inline-flex size-6 items-center justify-center rounded-md transition-colors",
-                      "focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring",
-                      showHelp
-                        ? "bg-muted text-foreground"
-                        : "text-muted-foreground hover:bg-muted hover:text-foreground",
-                    )}
-                  >
-                    <Info className="size-3.5" aria-hidden />
-                  </button>
-                }
-              />
-              <TooltipContent>What is {event.type}?</TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger
-                render={
-                  <button
-                    type="button"
-                    onClick={() => setShowRaw(!showRaw)}
-                    aria-expanded={showRaw}
-                    aria-label="Toggle raw event JSON"
-                    className={cn(
-                      "inline-flex size-6 items-center justify-center rounded-md transition-colors",
-                      "focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring",
-                      showRaw
-                        ? "bg-muted text-foreground"
-                        : "text-muted-foreground hover:bg-muted hover:text-foreground",
-                    )}
-                  >
-                    <Braces className="size-3.5" aria-hidden />
-                  </button>
-                }
-              />
-              <TooltipContent>{showRaw ? "Hide raw JSON" : "Show raw JSON"}</TooltipContent>
-            </Tooltip>
-            <CopyButton value={rawJson} label="Copy raw JSON" className="size-6 justify-center p-0" />
-          </div>
         </div>
-
-        {showHelp && (
-          <div className="mb-2 rounded-lg border border-border bg-muted/40 px-2.5 py-2 text-xs leading-relaxed text-muted-foreground">
-            <span className="font-mono font-semibold text-foreground">
-              {event.type}
-            </span>{" "}
-            — {helpText}
-          </div>
-        )}
-        {showRaw ? (
-          <pre className="mb-2 max-h-64 max-w-full overflow-auto whitespace-pre-wrap break-words rounded-lg border border-border bg-muted p-2.5 font-mono text-xs leading-relaxed text-foreground [overflow-wrap:anywhere]">
-            {rawJson}
-          </pre>
-        ) : content && cfg.cardCls ? (
-          <div className={`rounded-lg border p-3 ${visual.cardCls}`}>{content}</div>
-        ) : (
-          content
-        )}
-      </div>
+      )}
     </div>
   );
 }
@@ -1179,6 +1448,10 @@ export function EventsTimeline({ events, focusRequest }: Props) {
   const [showSystem, setShowSystem] = useState(true);
   const [onlyTokenEvents, setOnlyTokenEvents] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [expandAll, setExpandAll] = useState<{
+    nonce: number;
+    mode: "open" | "closed";
+  } | null>(null);
 
   const typedEvents = useMemo(() => {
     return events.map((event) => {
@@ -1376,11 +1649,47 @@ export function EventsTimeline({ events, focusRequest }: Props) {
             </button>
           )}
 
-          <span className="ml-auto shrink-0 text-xs tabular-nums text-muted-foreground">
-            {filtered.length === events.length
-              ? `${events.length} events`
-              : `${filtered.length} of ${events.length} events`}
-          </span>
+          <div className="ml-auto flex shrink-0 items-center gap-1">
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setExpandAll({ nonce: Date.now(), mode: "open" })
+                    }
+                    aria-label="Expand all events"
+                    className="inline-flex size-8 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring"
+                  >
+                    <ChevronsUpDown className="size-3.5" aria-hidden />
+                  </button>
+                }
+              />
+              <TooltipContent>Expand all</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setExpandAll({ nonce: Date.now(), mode: "closed" })
+                    }
+                    aria-label="Collapse all events"
+                    className="inline-flex size-8 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring"
+                  >
+                    <ChevronsDownUp className="size-3.5" aria-hidden />
+                  </button>
+                }
+              />
+              <TooltipContent>Collapse all</TooltipContent>
+            </Tooltip>
+            <span className="ml-1 text-xs tabular-nums text-muted-foreground">
+              {filtered.length === events.length
+                ? `${events.length} events`
+                : `${filtered.length} of ${events.length} events`}
+            </span>
+          </div>
         </div>
 
         {filtersOpen && (
@@ -1478,6 +1787,7 @@ export function EventsTimeline({ events, focusRequest }: Props) {
                 key={event.id}
                 event={event}
                 prevTimestamp={i > 0 ? group.events[i - 1].timestamp : undefined}
+                expandAll={expandAll}
               />
             ))}
           </div>

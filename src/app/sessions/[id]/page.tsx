@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useEffect, useState } from "react";
+import { use, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   AlertTriangle,
@@ -73,6 +73,26 @@ export default function SessionPage({
       cancelled = true;
     };
   }, [id, reloadToken]);
+
+  // Distribution of raw event types, for the optimizer's breakdown chart.
+  const eventTypeCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const e of data?.events ?? []) {
+      counts.set(e.type, (counts.get(e.type) ?? 0) + 1);
+    }
+    return Array.from(counts, ([name, value]) => ({ name, value }));
+  }, [data]);
+
+  // Real working time: the span between the first and last recorded event.
+  const activeMs = useMemo(() => {
+    const events = data?.events ?? [];
+    if (events.length < 2) return null;
+    const times = events
+      .map((e) => new Date(e.timestamp).getTime())
+      .filter((t) => Number.isFinite(t));
+    if (times.length < 2) return null;
+    return Math.max(...times) - Math.min(...times);
+  }, [data]);
 
   function retry() {
     setLoading(true);
@@ -149,7 +169,11 @@ export default function SessionPage({
         </div>
       ) : (
         <>
-          <SessionHeader meta={data.meta} stats={data.stats} />
+          <SessionHeader
+            meta={data.meta}
+            stats={data.stats}
+            activeMs={activeMs}
+          />
 
           <main id="main" className="mx-auto max-w-6xl px-4 py-5 sm:px-6">
             <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -243,6 +267,7 @@ export default function SessionPage({
                 <TokenOptimizer
                   analysis={data.tokenAnalysis}
                   stats={data.stats}
+                  eventTypeCounts={eventTypeCounts}
                   onFocusHint={(focus) => {
                     setActiveTab("events");
                     setEventFocusRequest({

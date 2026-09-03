@@ -67,7 +67,7 @@ export function SessionCard({ session: s }: { session: SessionMeta }) {
       href={`/sessions/${s.id}`}
       className="group block rounded-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
     >
-      <article className="relative rounded-xl border border-border bg-card px-4 py-3 transition-all duration-150 hover:border-foreground/25 hover:shadow-md hover:shadow-foreground/5">
+      <article className="relative rounded-xl border border-border bg-card px-4 py-3 transition-all duration-150 hover:border-brand/40 hover:shadow-md hover:shadow-foreground/5">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
             <h3 className="line-clamp-2 break-words text-sm font-semibold leading-snug text-foreground">
@@ -105,7 +105,7 @@ export function SessionCard({ session: s }: { session: SessionMeta }) {
               )}
             </div>
             <ChevronRight
-              className="size-4 shrink-0 text-muted-foreground/40 transition-transform group-hover:translate-x-0.5 group-hover:text-foreground/60"
+              className="size-4 shrink-0 text-muted-foreground/40 transition-transform group-hover:translate-x-0.5 group-hover:text-brand"
               aria-hidden
             />
           </div>

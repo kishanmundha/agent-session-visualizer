@@ -1,0 +1,183 @@
+"use client";
+
+import Link from "next/link";
+import {
+  ArrowDownToLine,
+  ArrowUpFromLine,
+  ChevronRight,
+  GitBranch,
+  MessageSquare,
+  Wrench,
+  Zap,
+} from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { firstLine, formatDateTime, formatTokens, timeAgo } from "@/lib/format";
+
+export interface SessionMeta {
+  id: string;
+  name?: string;
+  title?: string;
+  cwd?: string;
+  repository?: string;
+  branch?: string;
+  created_at?: string;
+  updated_at?: string;
+  host_type?: string;
+  client_name?: string;
+  eventCount?: number;
+  toolCallCount?: number;
+  userMessageCount?: number;
+  totalOutputTokens?: number;
+  totalInputTokens?: number;
+}
+
+function Stat({
+  icon: Icon,
+  value,
+  label,
+}: {
+  icon: typeof Zap;
+  value: number;
+  label: string;
+}) {
+  return (
+    <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+      <Icon className="size-3.5 opacity-70" aria-hidden />
+      <span className="font-medium tabular-nums text-foreground">
+        {value.toLocaleString()}
+      </span>
+      <span>{label}</span>
+    </span>
+  );
+}
+
+export function SessionCard({ session: s }: { session: SessionMeta }) {
+  // Prefer the AI-generated checkpoint title; fall back to the raw session name.
+  const rawName = firstLine(s.name);
+  const displayTitle = s.title ?? rawName;
+  const subtitle = s.title ? rawName : undefined;
+  const input = s.totalInputTokens ?? 0;
+  const output = s.totalOutputTokens ?? 0;
+  const hasStats =
+    !!s.eventCount || !!s.toolCallCount || !!s.userMessageCount || input + output > 0;
+
+  return (
+    <Link
+      href={`/sessions/${s.id}`}
+      className="group block rounded-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+    >
+      <article className="relative rounded-xl border border-border bg-card px-4 py-3 transition-all duration-150 hover:border-foreground/25 hover:shadow-md hover:shadow-foreground/5">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <h3 className="line-clamp-2 break-words text-sm font-semibold leading-snug text-foreground">
+              {displayTitle ?? (
+                <span className="font-normal italic text-muted-foreground">
+                  Unnamed session
+                </span>
+              )}
+            </h3>
+            {subtitle && (
+              <p className="mt-0.5 line-clamp-1 break-words text-xs text-muted-foreground">
+                {subtitle}
+              </p>
+            )}
+          </div>
+
+          <div className="flex shrink-0 items-center gap-2">
+            <div className="flex flex-col items-end gap-1">
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <span className="whitespace-nowrap text-xs text-muted-foreground">
+                      {timeAgo(s.updated_at)}
+                    </span>
+                  }
+                />
+                <TooltipContent>
+                  Updated {formatDateTime(s.updated_at)}
+                </TooltipContent>
+              </Tooltip>
+              {s.client_name && (
+                <Badge variant="secondary" className="hidden text-xs sm:inline-flex">
+                  {s.client_name}
+                </Badge>
+              )}
+            </div>
+            <ChevronRight
+              className="size-4 shrink-0 text-muted-foreground/40 transition-transform group-hover:translate-x-0.5 group-hover:text-foreground/60"
+              aria-hidden
+            />
+          </div>
+        </div>
+
+        {/* Where the work happened */}
+        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+          {s.repository && (
+            <span className="inline-flex min-w-0 items-center gap-1">
+              <span className="truncate font-mono text-foreground/80">
+                {s.repository}
+              </span>
+            </span>
+          )}
+          {s.branch && (
+            <span className="inline-flex items-center gap-1">
+              <GitBranch className="size-3 opacity-70" aria-hidden />
+              <span className="font-mono">{s.branch}</span>
+            </span>
+          )}
+          {!s.repository && s.cwd && (
+            <span className="max-w-full truncate font-mono opacity-80">{s.cwd}</span>
+          )}
+        </div>
+
+        {hasStats && (
+          <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1.5 border-t border-border/70 pt-2.5">
+            {!!s.userMessageCount && (
+              <Stat icon={MessageSquare} value={s.userMessageCount} label="turns" />
+            )}
+            {!!s.toolCallCount && (
+              <Stat icon={Wrench} value={s.toolCallCount} label="tools" />
+            )}
+            {!!s.eventCount && <Stat icon={Zap} value={s.eventCount} label="events" />}
+
+            {input + output > 0 && (
+              <div className="ml-auto flex items-center gap-1.5">
+                {input > 0 && (
+                  <Tooltip>
+                    <TooltipTrigger
+                      render={
+                        <span className="inline-flex items-center gap-1 rounded border border-blue-200 bg-blue-50 px-1.5 py-0.5 font-mono text-xs text-blue-700 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-300">
+                          <ArrowUpFromLine className="size-3" aria-hidden />
+                          {formatTokens(input)}
+                        </span>
+                      }
+                    />
+                    <TooltipContent>
+                      {input.toLocaleString()} input tokens
+                    </TooltipContent>
+                  </Tooltip>
+                )}
+                {output > 0 && (
+                  <Tooltip>
+                    <TooltipTrigger
+                      render={
+                        <span className="inline-flex items-center gap-1 rounded border border-indigo-200 bg-indigo-50 px-1.5 py-0.5 font-mono text-xs text-indigo-700 dark:border-indigo-900 dark:bg-indigo-950/40 dark:text-indigo-300">
+                          <ArrowDownToLine className="size-3" aria-hidden />
+                          {formatTokens(output)}
+                        </span>
+                      }
+                    />
+                    <TooltipContent>
+                      {output.toLocaleString()} output tokens
+                    </TooltipContent>
+                  </Tooltip>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </article>
+    </Link>
+  );
+}

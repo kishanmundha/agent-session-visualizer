@@ -1,7 +1,9 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
+import Script from "next/script";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { themeInitScript } from "@/components/common/theme-toggle";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -16,17 +18,44 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Copilot Session Visualizer",
+  title: {
+    default: "Copilot Session Visualizer",
+    template: "%s · Copilot Session Visualizer",
+  },
   description: "Visualize GitHub Copilot CLI sessions",
+};
+
+export const viewport: Viewport = {
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
+    { media: "(prefers-color-scheme: dark)", color: "#0a0a0a" },
+  ],
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
+      suppressHydrationWarning
       className={`${inter.variable} ${jetbrainsMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col bg-background text-foreground font-sans">
+      <head>
+        {/* Resolve the theme before paint so there is no light/dark flash.
+            next/script hoists this out of the React tree, which keeps React
+            from warning about a client-rendered <script>. */}
+        <Script
+          id="cv-theme-init"
+          strategy="beforeInteractive"
+          dangerouslySetInnerHTML={{ __html: themeInitScript }}
+        />
+      </head>
+      <body className="flex min-h-full flex-col bg-background font-sans text-foreground">
+        <a
+          href="#main"
+          className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-foreground focus:px-3 focus:py-2 focus:text-sm focus:text-background"
+        >
+          Skip to content
+        </a>
         <TooltipProvider>{children}</TooltipProvider>
       </body>
     </html>

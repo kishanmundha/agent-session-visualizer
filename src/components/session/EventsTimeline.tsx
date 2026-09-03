@@ -1,7 +1,21 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
+import {
+  Braces,
+  ChevronDown,
+  Filter,
+  Info,
+  ListFilter,
+  SearchX,
+  SlidersHorizontal,
+  X,
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { CopyButton } from "@/components/common/copy-button";
+import { SearchInput } from "@/components/common/search-input";
+import { cn } from "@/lib/utils";
 
 interface CopilotEvent {
   type: string;
@@ -232,6 +246,9 @@ const CATEGORY_VISUAL: Record<string, { dotCls: string; cardCls: string; typeCls
     chipCls: "border-zinc-300 bg-zinc-100 text-zinc-800 dark:border-zinc-700 dark:bg-zinc-900/60 dark:text-zinc-300",
   },
 };
+
+/** Events rendered per page; the rest load on demand. */
+const PAGE_SIZE = 150;
 
 const EVENT_TYPE_HELP: Record<string, string> = {
   "session.start": "Session initialization event. Captures the runtime context and selected model when a session begins.",
@@ -949,7 +966,6 @@ function EventCard({ event, prevTimestamp }: { event: CopilotEvent; prevTimestam
   const gap = prevTimestamp ? durationMs(prevTimestamp, event.timestamp) : null;
   const [showRaw, setShowRaw] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
-  const [copyStatus, setCopyStatus] = useState<"idle" | "copied" | "failed">("idle");
   const typeParts = splitEventType(event.type);
   const categoryVisual = CATEGORY_VISUAL[typeParts.category];
   const visual = categoryVisual ?? cfg;
@@ -1039,87 +1055,109 @@ function EventCard({ event, prevTimestamp }: { event: CopilotEvent; prevTimestam
   const content = renderContent();
   const rawJson = JSON.stringify(event, null, 2);
 
-  function handleCopyRaw() {
-    setCopyStatus("idle");
-    navigator.clipboard.writeText(rawJson)
-      .then(() => {
-        setCopyStatus("copied");
-        window.setTimeout(() => setCopyStatus("idle"), 1600);
-      })
-      .catch(() => {
-        setCopyStatus("failed");
-      });
-  }
-
   return (
-    <div className="flex gap-3">
+    <div className="group/event flex gap-3">
       <div className="flex flex-col items-center">
-        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm shrink-0 border ${visual.dotCls}`}>
+        <div
+          className={`flex size-8 shrink-0 items-center justify-center rounded-full border text-sm ${visual.dotCls}`}
+        >
           {cfg.icon}
         </div>
-        <div className="w-px flex-1 bg-border mt-1"></div>
+        <div className="mt-1 w-px flex-1 bg-border" />
       </div>
 
-      <div className="flex-1 min-w-0 pb-4">
-        <div className="flex items-center gap-2 mb-1">
-          <span className={`text-xs font-semibold font-mono ${visual.typeCls}`}>{typeParts.category}</span>
-          <span className="text-[11px] px-1.5 py-0.5 rounded border border-border bg-background text-muted-foreground font-mono">
+      <div className="min-w-0 flex-1 pb-4">
+        <div className="mb-1 flex items-center gap-2">
+          <span className={`font-mono text-xs font-semibold ${visual.typeCls}`}>
+            {typeParts.category}
+          </span>
+          <span className="rounded border border-border bg-background px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground">
             {typeParts.subCategory}
           </span>
-          <span className="text-[11px] text-muted-foreground font-mono hidden sm:inline">
-            {event.type}
-          </span>
           {gap !== null && gap > 5000 && (
-            <span className="text-xs text-muted-foreground">
-              +{gap > 60000 ? `${(gap / 60000).toFixed(1)}m` : `${(gap / 1000).toFixed(1)}s`}
-            </span>
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] tabular-nums text-muted-foreground">
+                    +{gap > 60000 ? `${(gap / 60000).toFixed(1)}m` : `${(gap / 1000).toFixed(1)}s`}
+                  </span>
+                }
+              />
+              <TooltipContent>Gap since the previous event</TooltipContent>
+            </Tooltip>
           )}
-          <span className="text-xs text-muted-foreground ml-auto">{formatTime(event.timestamp)}</span>
-          <button
-            onClick={() => setShowHelp(!showHelp)}
-            className="text-xs text-muted-foreground hover:text-foreground px-1.5 py-0.5 rounded border border-border hover:border-foreground/30 transition-colors font-mono"
-            title="Explain this event type"
-          >
-            ℹ
-          </button>
-          <button
-            onClick={() => setShowRaw(!showRaw)}
-            className="text-xs text-muted-foreground hover:text-foreground px-1.5 py-0.5 rounded border border-border hover:border-foreground/30 transition-colors font-mono"
-            title="Toggle raw event JSON"
-          >
-            {showRaw ? "hide raw" : "{ }"}
-          </button>
-          <button
-            onClick={handleCopyRaw}
-            className="text-xs text-muted-foreground hover:text-foreground px-1.5 py-0.5 rounded border border-border hover:border-foreground/30 transition-colors font-mono"
-            title="Copy raw event JSON"
-          >
-            copy raw
-          </button>
-          {copyStatus === "copied" && (
-            <span className="text-[11px] text-emerald-600 dark:text-emerald-400">copied</span>
-          )}
-          {copyStatus === "failed" && (
-            <span className="text-[11px] text-red-600 dark:text-red-400">copy failed</span>
-          )}
+
+          <span className="ml-auto shrink-0 font-mono text-xs tabular-nums text-muted-foreground">
+            {formatTime(event.timestamp)}
+          </span>
+
+          {/* Row actions stay out of the way until the row is hovered or focused. */}
+          <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity focus-within:opacity-100 group-hover/event:opacity-100 max-sm:opacity-100">
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <button
+                    type="button"
+                    onClick={() => setShowHelp(!showHelp)}
+                    aria-expanded={showHelp}
+                    aria-label="Explain this event type"
+                    className={cn(
+                      "inline-flex size-6 items-center justify-center rounded-md transition-colors",
+                      "focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring",
+                      showHelp
+                        ? "bg-muted text-foreground"
+                        : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                    )}
+                  >
+                    <Info className="size-3.5" aria-hidden />
+                  </button>
+                }
+              />
+              <TooltipContent>What is {event.type}?</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <button
+                    type="button"
+                    onClick={() => setShowRaw(!showRaw)}
+                    aria-expanded={showRaw}
+                    aria-label="Toggle raw event JSON"
+                    className={cn(
+                      "inline-flex size-6 items-center justify-center rounded-md transition-colors",
+                      "focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring",
+                      showRaw
+                        ? "bg-muted text-foreground"
+                        : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                    )}
+                  >
+                    <Braces className="size-3.5" aria-hidden />
+                  </button>
+                }
+              />
+              <TooltipContent>{showRaw ? "Hide raw JSON" : "Show raw JSON"}</TooltipContent>
+            </Tooltip>
+            <CopyButton value={rawJson} label="Copy raw JSON" className="size-6 justify-center p-0" />
+          </div>
         </div>
+
         {showHelp && (
-          <div className="mb-2 text-xs rounded-lg border border-border bg-muted/40 px-2.5 py-2 text-muted-foreground leading-relaxed">
-            <span className="font-semibold text-foreground">About {event.type}: </span>
-            {helpText}
+          <div className="mb-2 rounded-lg border border-border bg-muted/40 px-2.5 py-2 text-xs leading-relaxed text-muted-foreground">
+            <span className="font-mono font-semibold text-foreground">
+              {event.type}
+            </span>{" "}
+            — {helpText}
           </div>
         )}
-        {showRaw && (
-          <pre className="mb-2 max-w-full p-2.5 bg-muted border border-border rounded-lg text-xs font-mono text-foreground whitespace-pre-wrap break-words [overflow-wrap:anywhere] overflow-auto max-h-64 leading-relaxed">
+        {showRaw ? (
+          <pre className="mb-2 max-h-64 max-w-full overflow-auto whitespace-pre-wrap break-words rounded-lg border border-border bg-muted p-2.5 font-mono text-xs leading-relaxed text-foreground [overflow-wrap:anywhere]">
             {rawJson}
           </pre>
+        ) : content && cfg.cardCls ? (
+          <div className={`rounded-lg border p-3 ${visual.cardCls}`}>{content}</div>
+        ) : (
+          content
         )}
-        {!showRaw && content && cfg.cardCls && (
-          <div className={`rounded-lg border p-3 ${visual.cardCls}`}>
-            {content}
-          </div>
-        )}
-        {!showRaw && content && !cfg.cardCls && content}
       </div>
     </div>
   );
@@ -1140,6 +1178,7 @@ export function EventsTimeline({ events, focusRequest }: Props) {
   const [search, setSearch] = useState("");
   const [showSystem, setShowSystem] = useState(true);
   const [onlyTokenEvents, setOnlyTokenEvents] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   const typedEvents = useMemo(() => {
     return events.map((event) => {
@@ -1208,6 +1247,8 @@ export function EventsTimeline({ events, focusRequest }: Props) {
       (focusRequest.categories ?? []).includes("system")
       || (focusRequest.subKeys ?? []).includes("system.message");
     if (wantsSystem) setShowSystem(true);
+    // Reveal the chips so it is obvious which filters the hint applied.
+    setFiltersOpen(true);
   }, [focusRequest]);
 
   const filtered = useMemo(() => {
@@ -1225,138 +1266,212 @@ export function EventsTimeline({ events, focusRequest }: Props) {
     });
   }, [visibleBySystem, selectedCategories, selectedSubKeys, onlyTokenEvents, search]);
 
+  // Render in pages: huge sessions (thousands of events) would otherwise mount
+  // every card up front and make the tab feel frozen. Tagging the page state
+  // with the filter signature resets it back to page one whenever the filters
+  // change, without an effect.
+  const filterKey = `${selectedCategories.join()}|${selectedSubKeys.join()}|${search}|${showSystem}|${onlyTokenEvents}`;
+  const [page, setPage] = useState({ key: filterKey, count: PAGE_SIZE });
+  const visibleCount = page.key === filterKey ? page.count : PAGE_SIZE;
+
+  const showMore = (count: number) => setPage({ key: filterKey, count });
+
+  const shown = useMemo(
+    () => filtered.slice(0, visibleCount),
+    [filtered, visibleCount],
+  );
+
   const groups = useMemo(() => {
     const g: { date: string; events: CopilotEvent[] }[] = [];
-    for (const ev of filtered) {
+    for (const ev of shown) {
       const d = formatDate(ev.timestamp);
       const last = g[g.length - 1];
       if (!last || last.date !== d) g.push({ date: d, events: [ev] });
       else last.events.push(ev);
     }
     return g;
-  }, [filtered]);
+  }, [shown]);
+
+  const activeFilterCount =
+    selectedCategories.length +
+    selectedSubKeys.length +
+    (search ? 1 : 0) +
+    (onlyTokenEvents ? 1 : 0) +
+    (showSystem ? 0 : 1);
+
+  function clearFilters() {
+    setSelectedCategories([]);
+    setSelectedSubKeys([]);
+    setSearch("");
+    setOnlyTokenEvents(false);
+    setShowSystem(true);
+  }
 
   return (
-    <div className="flex flex-col gap-4">
-      {/* Controls */}
-      <div className="space-y-2">
-        <div className="flex items-center gap-2 flex-wrap">
-          {categoryCounts.map(({ category, count, representativeType }) => {
-            const isActive = selectedCategories.includes(category);
-            return (
-              <button
-                key={category}
-                onClick={() => {
-                  setSelectedCategories((prev) =>
-                    prev.includes(category)
-                      ? prev.filter((value) => value !== category)
-                      : [...prev, category]
-                  );
-                }}
-                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs border font-mono transition-colors ${
-                  representativeType ? getTypeChipClass(representativeType) : getCategoryChipClass(category)
-                } ${
-                  isActive ? "ring-2 ring-ring ring-offset-1 ring-offset-background" : "opacity-80 hover:opacity-100"
-                }`}
-              >
-                <span>{category}</span>
-                <span className="font-bold">{count}</span>
-              </button>
-            );
-          })}
+    <div className="flex flex-col">
+      {/* Toolbar. Sticks below the page chrome so filters stay reachable
+          while scrolling a long timeline. */}
+      <div className="sticky top-[calc(var(--cv-topbar-h)+var(--cv-tabbar-h))] z-10 -mx-4 mb-4 border-b border-border bg-background/90 px-4 py-2.5 backdrop-blur supports-[backdrop-filter]:bg-background/75 sm:-mx-6 sm:px-6">
+        <div className="flex flex-wrap items-center gap-2">
+          <SearchInput
+            value={search}
+            onChange={setSearch}
+            shortcut
+            placeholder="Search events…"
+            aria-label="Search events"
+            className="w-full sm:w-56"
+          />
+
+          <button
+            type="button"
+            onClick={() => setFiltersOpen((v) => !v)}
+            aria-expanded={filtersOpen}
+            className={cn(
+              "inline-flex h-9 items-center gap-1.5 rounded-lg border px-2.5 text-xs font-medium transition-colors",
+              "focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring",
+              selectedCategories.length + selectedSubKeys.length > 0
+                ? "border-foreground/25 bg-muted text-foreground"
+                : "border-border text-muted-foreground hover:text-foreground",
+            )}
+          >
+            <SlidersHorizontal className="size-3.5" aria-hidden />
+            Filters
+            {selectedCategories.length + selectedSubKeys.length > 0 && (
+              <span className="rounded bg-foreground/10 px-1 tabular-nums">
+                {selectedCategories.length + selectedSubKeys.length}
+              </span>
+            )}
+            <ChevronDown
+              className={cn(
+                "size-3.5 transition-transform",
+                filtersOpen && "rotate-180",
+              )}
+              aria-hidden
+            />
+          </button>
+
+          <ToolbarToggle
+            active={!showSystem}
+            onClick={() => setShowSystem(!showSystem)}
+            icon={Filter}
+            label="Hide system"
+            title="Hide system.message events, which are usually large VS Code context blocks"
+          />
+          <ToolbarToggle
+            active={onlyTokenEvents}
+            onClick={() => setOnlyTokenEvents(!onlyTokenEvents)}
+            icon={ListFilter}
+            label="Token events"
+            title="Show only events that report token usage"
+          />
+
+          {activeFilterCount > 0 && (
+            <button
+              type="button"
+              onClick={clearFilters}
+              className="inline-flex h-9 items-center gap-1 rounded-lg px-2 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring"
+            >
+              <X className="size-3.5" aria-hidden />
+              Clear
+            </button>
+          )}
+
+          <span className="ml-auto shrink-0 text-xs tabular-nums text-muted-foreground">
+            {filtered.length === events.length
+              ? `${events.length} events`
+              : `${filtered.length} of ${events.length} events`}
+          </span>
         </div>
 
-        {selectedCategories.length > 0 && (
-          <div className="flex items-center gap-2 flex-wrap">
-            {subCategoryCounts.map(({ category, subCategory, count }) => {
-              const key = `${category}.${subCategory}`;
-              const isActive = selectedSubKeys.includes(key);
-              return (
-                <button
-                  key={key}
-                  onClick={() => {
-                    setSelectedSubKeys((prev) =>
-                      prev.includes(key)
-                        ? prev.filter((value) => value !== key)
-                        : [...prev, key]
-                    );
-                  }}
-                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs border font-mono transition-colors ${getTypeChipClass(key)} ${
-                    isActive
-                      ? "ring-2 ring-ring ring-offset-1 ring-offset-background"
-                      : "opacity-80 hover:opacity-100"
-                  }`}
-                  title={`${category}.${subCategory}`}
-                >
-                  {selectedCategories.length > 1 && (
-                    <span className="opacity-70">{category}:</span>
-                  )}
-                  <span>{subCategory}</span>
-                  <span className="font-bold">{count}</span>
-                </button>
-              );
-            })}
+        {filtersOpen && (
+          <div className="mt-2.5 space-y-2 border-t border-border pt-2.5">
+            <div className="flex flex-wrap items-center gap-1.5">
+              {categoryCounts.map(({ category, count, representativeType }) => {
+                const isActive = selectedCategories.includes(category);
+                return (
+                  <button
+                    key={category}
+                    type="button"
+                    aria-pressed={isActive}
+                    onClick={() =>
+                      setSelectedCategories((prev) =>
+                        prev.includes(category)
+                          ? prev.filter((value) => value !== category)
+                          : [...prev, category],
+                      )
+                    }
+                    className={cn(
+                      "inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 font-mono text-xs transition-all",
+                      "focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring",
+                      representativeType
+                        ? getTypeChipClass(representativeType)
+                        : getCategoryChipClass(category),
+                      isActive
+                        ? "ring-2 ring-ring ring-offset-1 ring-offset-background"
+                        : "opacity-70 hover:opacity-100",
+                    )}
+                  >
+                    <span>{category}</span>
+                    <span className="font-bold tabular-nums">{count}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {selectedCategories.length > 0 && subCategoryCounts.length > 0 && (
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                  Sub-type
+                </span>
+                {subCategoryCounts.map(({ category, subCategory, count }) => {
+                  const key = `${category}.${subCategory}`;
+                  const isActive = selectedSubKeys.includes(key);
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      aria-pressed={isActive}
+                      title={key}
+                      onClick={() =>
+                        setSelectedSubKeys((prev) =>
+                          prev.includes(key)
+                            ? prev.filter((value) => value !== key)
+                            : [...prev, key],
+                        )
+                      }
+                      className={cn(
+                        "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 font-mono text-xs transition-all",
+                        "focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring",
+                        getTypeChipClass(key),
+                        isActive
+                          ? "ring-2 ring-ring ring-offset-1 ring-offset-background"
+                          : "opacity-70 hover:opacity-100",
+                      )}
+                    >
+                      {selectedCategories.length > 1 && (
+                        <span className="opacity-70">{category}:</span>
+                      )}
+                      <span>{subCategory}</span>
+                      <span className="font-bold tabular-nums">{count}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
       </div>
 
-      <div className="flex items-center gap-3 flex-wrap">
-        <input
-          type="text"
-          placeholder="Search events..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="bg-background border border-input rounded-lg px-3 py-1.5 text-sm text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring w-48"
-        />
-        <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer select-none">
-          <input
-            type="checkbox"
-            checked={showSystem}
-            onChange={(e) => setShowSystem(e.target.checked)}
-            className="accent-primary"
-          />
-          Show system messages
-        </label>
-        <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer select-none">
-          <input
-            type="checkbox"
-            checked={onlyTokenEvents}
-            onChange={(e) => setOnlyTokenEvents(e.target.checked)}
-            className="accent-primary"
-          />
-          Only token-consuming events
-        </label>
-        <button
-          onClick={() => {
-            setSelectedCategories([]);
-            setSelectedSubKeys([]);
-            setSearch("");
-            setOnlyTokenEvents(false);
-          }}
-          className={`text-xs px-2 py-1 rounded border font-mono transition-colors ${
-            selectedCategories.length > 0 || selectedSubKeys.length > 0 || search || onlyTokenEvents
-              ? "border-border text-foreground hover:bg-muted"
-              : "border-border text-muted-foreground opacity-60 cursor-not-allowed"
-          }`}
-          disabled={selectedCategories.length === 0 && selectedSubKeys.length === 0 && !search && !onlyTokenEvents}
-        >
-          Clear filters
-        </button>
-        <span className="text-xs text-muted-foreground ml-auto">
-          {filtered.length} / {events.length} events
-        </span>
-      </div>
-
       {/* Timeline */}
-      <div className="space-y-0 pr-2">
+      <div className="pr-2">
         {groups.map((group) => (
           <div key={group.date}>
-            <div className="flex items-center gap-3 my-4">
-              <div className="h-px flex-1 bg-border"></div>
-              <span className="text-xs text-muted-foreground font-medium px-2 py-0.5 bg-muted rounded-full border border-border">
+            <div className="my-4 flex items-center gap-3">
+              <div className="h-px flex-1 bg-border" />
+              <span className="rounded-full border border-border bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
                 {group.date}
               </span>
-              <div className="h-px flex-1 bg-border"></div>
+              <div className="h-px flex-1 bg-border" />
             </div>
             {group.events.map((event, i) => (
               <EventCard
@@ -1367,10 +1482,93 @@ export function EventsTimeline({ events, focusRequest }: Props) {
             ))}
           </div>
         ))}
+
+        {visibleCount < filtered.length && (
+          <div className="flex flex-col items-center gap-2 py-6">
+            <p className="text-xs text-muted-foreground">
+              Showing {shown.length.toLocaleString()} of{" "}
+              {filtered.length.toLocaleString()} matching events
+            </p>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => showMore(visibleCount + PAGE_SIZE)}
+                className="rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-medium transition-colors hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring"
+              >
+                Load {Math.min(PAGE_SIZE, filtered.length - visibleCount)} more
+              </button>
+              <button
+                type="button"
+                onClick={() => showMore(filtered.length)}
+                className="rounded-lg px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring"
+              >
+                Show all
+              </button>
+            </div>
+          </div>
+        )}
+
         {filtered.length === 0 && (
-          <div className="text-center py-12 text-muted-foreground">No events match filter</div>
+          <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-border px-6 py-14 text-center">
+            <div className="flex size-10 items-center justify-center rounded-full bg-muted text-muted-foreground">
+              <SearchX className="size-5" aria-hidden />
+            </div>
+            <p className="text-sm font-medium text-foreground">
+              No events match your filters
+            </p>
+            <p className="max-w-sm text-xs text-muted-foreground">
+              {events.length.toLocaleString()} events are recorded in this session.
+            </p>
+            <button
+              type="button"
+              onClick={clearFilters}
+              className="mt-2 rounded-md border border-border bg-background px-2.5 py-1 text-xs font-medium transition-colors hover:bg-muted"
+            >
+              Clear filters
+            </button>
+          </div>
         )}
       </div>
     </div>
+  );
+}
+
+/** Compact on/off control used by the timeline toolbar. */
+function ToolbarToggle({
+  active,
+  onClick,
+  icon: Icon,
+  label,
+  title,
+}: {
+  active: boolean;
+  onClick: () => void;
+  icon: typeof Filter;
+  label: string;
+  title: string;
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <button
+            type="button"
+            onClick={onClick}
+            aria-pressed={active}
+            className={cn(
+              "inline-flex h-9 items-center gap-1.5 rounded-lg border px-2.5 text-xs font-medium transition-colors",
+              "focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring",
+              active
+                ? "border-foreground/25 bg-muted text-foreground"
+                : "border-border text-muted-foreground hover:text-foreground",
+            )}
+          >
+            <Icon className="size-3.5" aria-hidden />
+            {label}
+          </button>
+        }
+      />
+      <TooltipContent>{title}</TooltipContent>
+    </Tooltip>
   );
 }

@@ -39,9 +39,9 @@ function TabCount({ value }: { value: number }) {
 export default function SessionPage({
   params,
 }: {
-  params: Promise<{ id: string }>;
+  params: Promise<{ provider: string; id: string }>;
 }) {
-  const { id } = use(params);
+  const { provider, id } = use(params);
   const [data, setData] = useState<SessionData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -56,7 +56,7 @@ export default function SessionPage({
     let cancelled = false;
     void (async () => {
       try {
-        const res = await fetch(`/api/sessions/${id}`);
+        const res = await fetch(`/api/sessions/${provider}/${id}`);
         if (!res.ok) throw new Error("Request failed");
         const json: SessionData = await res.json();
         if (!json?.meta) throw new Error("Not found");
@@ -72,7 +72,7 @@ export default function SessionPage({
     return () => {
       cancelled = true;
     };
-  }, [id, reloadToken]);
+  }, [provider, id, reloadToken]);
 
   // Distribution of raw event types, for the optimizer's breakdown chart.
   const eventTypeCounts = useMemo(() => {
@@ -184,24 +184,28 @@ export default function SessionPage({
                     Events
                     <TabCount value={data.events.length} />
                   </TabsTrigger>
-                  <TabsTrigger value="checkpoints" className="px-3">
-                    <Bookmark className="size-4" aria-hidden />
-                    Checkpoints
-                    <TabCount value={data.checkpoints.length} />
-                  </TabsTrigger>
+                  {data.checkpoints.length > 0 && (
+                    <TabsTrigger value="checkpoints" className="px-3">
+                      <Bookmark className="size-4" aria-hidden />
+                      Checkpoints
+                      <TabCount value={data.checkpoints.length} />
+                    </TabsTrigger>
+                  )}
                   <TabsTrigger value="files" className="px-3">
                     <FileText className="size-4" aria-hidden />
                     Files
                     <TabCount value={data.files.length} />
                   </TabsTrigger>
-                  <TabsTrigger value="research" className="px-3">
-                    <FlaskConical className="size-4" aria-hidden />
-                    Research
-                    <TabCount value={data.research.length} />
-                  </TabsTrigger>
+                  {data.research.length > 0 && (
+                    <TabsTrigger value="research" className="px-3">
+                      <FlaskConical className="size-4" aria-hidden />
+                      Research
+                      <TabCount value={data.research.length} />
+                    </TabsTrigger>
+                  )}
                   <TabsTrigger value="workspace" className="px-3">
                     <ClipboardList className="size-4" aria-hidden />
-                    Workspace
+                    Metadata
                   </TabsTrigger>
                   <TabsTrigger value="optimizer" className="px-3">
                     <Lightbulb className="size-4" aria-hidden />
@@ -245,19 +249,19 @@ export default function SessionPage({
                 <div className="overflow-hidden rounded-xl border border-border">
                   <div className="flex items-center gap-2 border-b border-border bg-muted/60 px-4 py-2">
                     <span className="font-mono text-xs text-muted-foreground">
-                      workspace.yaml
+                      {data.rawMeta.name}
                     </span>
-                    {data.workspaceYaml && (
+                    {data.rawMeta.content && (
                       <CopyButton
-                        value={data.workspaceYaml}
-                        label="Copy workspace.yaml"
+                        value={data.rawMeta.content}
+                        label={`Copy ${data.rawMeta.name}`}
                         className="ml-auto"
                       />
                     )}
                   </div>
                   <ScrollArea className="h-[60vh] w-full">
                     <pre className="w-max min-w-full p-4 font-mono text-xs text-foreground">
-                      {data.workspaceYaml || "No workspace.yaml found"}
+                      {data.rawMeta.content || "No session metadata found"}
                     </pre>
                   </ScrollArea>
                 </div>

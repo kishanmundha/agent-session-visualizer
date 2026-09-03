@@ -20,7 +20,7 @@ export function CheckpointsList({
       <EmptyState
         icon={Bookmark}
         title="No checkpoints"
-        description="Copilot writes checkpoint files when it summarizes progress during a session."
+        description="Copilot CLI writes checkpoint files when it summarizes progress. Claude Code and Codex sessions have none."
       />
     );
   }
@@ -111,7 +111,7 @@ export function PathList({
         description={
           kind === "research"
             ? "Research notes appear here when the agent saves its findings."
-            : "This session did not record any files in its workspace state."
+            : "No files recorded. Copilot lists its workspace files here; Claude Code and Codex list the files the session edited."
         }
       />
     );

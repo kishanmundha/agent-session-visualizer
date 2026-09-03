@@ -19,10 +19,11 @@ const jetbrainsMono = JetBrains_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: "Copilot Session Visualizer",
-    template: "%s · Copilot Session Visualizer",
+    default: "Agent Session Visualizer",
+    template: "%s · Agent Session Visualizer",
   },
-  description: "Visualize GitHub Copilot CLI sessions",
+  description:
+    "Visualize GitHub Copilot CLI, Claude Code and OpenAI Codex CLI sessions",
 };
 
 export const viewport: Viewport = {

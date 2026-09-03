@@ -16,6 +16,8 @@ import {
   formatFullDateTime,
   timeAgo,
 } from "@/lib/format";
+import { providerStyle } from "@/lib/provider-meta";
+import { cn } from "@/lib/utils";
 import type { SessionMeta, SessionStats } from "./types";
 
 function tokens(n: number) {
@@ -38,6 +40,7 @@ export function SessionHeader({
   const title = meta.title ?? rawName;
   const subtitle = meta.title ? rawName : undefined;
 
+  const provider = providerStyle(meta.provider);
   const input = stats?.totalInputTokens ?? 0;
   const output = stats?.totalOutputTokens ?? 0;
   const cache = stats?.totalCacheReadTokens ?? 0;
@@ -69,6 +72,20 @@ export function SessionHeader({
           </div>
 
           <div className="flex flex-wrap items-center gap-2 sm:shrink-0 sm:justify-end">
+            <span
+              className={cn(
+                "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium",
+                provider.badgeCls,
+              )}
+            >
+              <span className={cn("size-1.5 rounded-full", provider.dotCls)} aria-hidden />
+              {provider.label}
+            </span>
+            {meta.model && (
+              <Badge variant="secondary" className="font-mono">
+                {meta.model}
+              </Badge>
+            )}
             {meta.client_name && (
               <Badge variant="secondary">{meta.client_name}</Badge>
             )}

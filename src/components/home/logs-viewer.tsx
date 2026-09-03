@@ -19,6 +19,8 @@ export interface LogFile {
   name: string;
   mtime: string;
   size: number;
+  /** Which agent CLI wrote the log; used when fetching its content. */
+  provider?: string;
 }
 
 type Level = "error" | "warn" | "info" | "debug";
@@ -57,6 +59,8 @@ export function LogsViewer({
 
   // Default to the newest log so the pane is never empty on arrival.
   const selected = picked ?? logs[0]?.name ?? null;
+  const selectedProvider =
+    logs.find((l) => l.name === selected)?.provider ?? "copilot";
   const loadingLog = selected !== null && loaded?.name !== selected;
   const content = loaded?.name === selected ? loaded.content : "";
 
@@ -70,7 +74,9 @@ export function LogsViewer({
     let cancelled = false;
     void (async () => {
       try {
-        const r = await fetch(`/api/logs?name=${encodeURIComponent(selected)}`);
+        const r = await fetch(
+          `/api/logs?provider=${encodeURIComponent(selectedProvider)}&name=${encodeURIComponent(selected)}`,
+        );
         const data = await r.json();
         if (!cancelled) setLoaded({ name: selected, content: data.content || "" });
       } catch {
@@ -80,7 +86,7 @@ export function LogsViewer({
     return () => {
       cancelled = true;
     };
-  }, [selected]);
+  }, [selected, selectedProvider]);
 
   function selectLog(name: string) {
     setPicked(name);

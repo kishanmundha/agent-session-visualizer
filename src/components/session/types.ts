@@ -1,71 +1,36 @@
-export interface SessionMeta {
-  id: string;
-  name?: string;
-  title?: string;
-  cwd?: string;
-  repository?: string;
-  branch?: string;
-  created_at?: string;
-  updated_at?: string;
-  host_type?: string;
-  client_name?: string;
-}
+/**
+ * Client-side view of the canonical session model. Re-exported from the
+ * provider layer so components and adapters cannot drift apart.
+ */
+export type {
+  AgentEvent,
+  CheckpointFile,
+  LogFile,
+  ProviderId,
+  ProviderInfo,
+  RawMetaDoc,
+  SessionMeta,
+  SessionStats,
+  TokenAnalysis,
+  TokenHint,
+} from "@/lib/providers/types";
 
-export interface CopilotEvent {
-  type: string;
-  data: Record<string, unknown>;
-  id: string;
-  timestamp: string;
-  parentId: string | null;
-}
-
-export interface CheckpointFile {
-  name: string;
-  content: string;
-}
-
-export interface SessionStats {
-  totalInputTokens: number;
-  totalOutputTokens: number;
-  totalCacheReadTokens: number;
-  totalToolCalls: number;
-  totalUserMessages: number;
-  totalAssistantMessages: number;
-  totalApiDurationMs: number;
-  totalPremiumRequests: number;
-  eventCount: number;
-}
-
-export interface TokenHint {
-  severity: "high" | "medium" | "low";
-  category: string;
-  title: string;
-  description: string;
-  saving?: string;
-  focus?: {
-    categories?: string[];
-    subKeys?: string[];
-    search?: string;
-  };
-}
-
-export interface TokenAnalysis {
-  hints: TokenHint[];
-  topToolsByCount: { name: string; count: number }[];
-  systemMessageChars: number;
-  toolResultChars: number;
-  assistantChars: number;
-  compactionCount: number;
-  hookEventCount: number;
-}
+import type {
+  AgentEvent,
+  CheckpointFile,
+  RawMetaDoc,
+  SessionMeta,
+  SessionStats,
+  TokenAnalysis,
+} from "@/lib/providers/types";
 
 export interface SessionData {
   meta: SessionMeta;
-  events: CopilotEvent[];
+  events: AgentEvent[];
   files: string[];
   checkpoints: CheckpointFile[];
   research: string[];
-  workspaceYaml: string;
+  rawMeta: RawMetaDoc;
   stats: SessionStats;
   tokenAnalysis: TokenAnalysis;
 }

@@ -1,15 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
-import { listLogs, getLogContent } from "@/lib/copilot";
+import { getLogContent, listLogs } from "@/lib/providers";
 
 export async function GET(req: NextRequest) {
-  const { searchParams } = new URL(req.url);
+  const { searchParams } = req.nextUrl;
   const name = searchParams.get("name");
+  const provider = searchParams.get("provider") ?? undefined;
 
   if (name) {
-    const content = getLogContent(name);
+    // Logs are only exposed by providers that declare a log directory.
+    const content = getLogContent(provider ?? "copilot", name);
     return NextResponse.json({ name, content });
   }
 
-  const logs = listLogs();
-  return NextResponse.json(logs);
+  return NextResponse.json(listLogs(provider));
 }

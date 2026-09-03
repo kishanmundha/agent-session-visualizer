@@ -13,24 +13,11 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { firstLine, formatDateTime, formatTokens, timeAgo } from "@/lib/format";
+import { providerStyle } from "@/lib/provider-meta";
+import { cn } from "@/lib/utils";
+import type { SessionMeta } from "@/components/session/types";
 
-export interface SessionMeta {
-  id: string;
-  name?: string;
-  title?: string;
-  cwd?: string;
-  repository?: string;
-  branch?: string;
-  created_at?: string;
-  updated_at?: string;
-  host_type?: string;
-  client_name?: string;
-  eventCount?: number;
-  toolCallCount?: number;
-  userMessageCount?: number;
-  totalOutputTokens?: number;
-  totalInputTokens?: number;
-}
+export type { SessionMeta };
 
 function Stat({
   icon: Icon,
@@ -61,15 +48,25 @@ export function SessionCard({ session: s }: { session: SessionMeta }) {
   const output = s.totalOutputTokens ?? 0;
   const hasStats =
     !!s.eventCount || !!s.toolCallCount || !!s.userMessageCount || input + output > 0;
+  const provider = providerStyle(s.provider);
 
   return (
     <Link
-      href={`/sessions/${s.id}`}
+      href={`/sessions/${s.provider}/${s.id}`}
       className="group block rounded-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
     >
       <article className="relative rounded-xl border border-border bg-card px-4 py-3 transition-all duration-150 hover:border-brand/40 hover:shadow-md hover:shadow-foreground/5">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
+            <span
+              className={cn(
+                "mb-1 inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px] font-medium",
+                provider.badgeCls,
+              )}
+            >
+              <span className={cn("size-1.5 rounded-full", provider.dotCls)} aria-hidden />
+              {provider.shortLabel}
+            </span>
             <h3 className="line-clamp-2 break-words text-sm font-semibold leading-snug text-foreground">
               {displayTitle ?? (
                 <span className="font-normal italic text-muted-foreground">

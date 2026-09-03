@@ -20,16 +20,10 @@ import { CopyButton } from "@/components/common/copy-button";
 import { SearchInput } from "@/components/common/search-input";
 import { cn } from "@/lib/utils";
 
-interface CopilotEvent {
-  type: string;
-  data: Record<string, unknown>;
-  id: string;
-  timestamp: string;
-  parentId: string | null;
-}
+import type { AgentEvent } from "./types";
 
 interface Props {
-  events: CopilotEvent[];
+  events: AgentEvent[];
   focusRequest?: {
     nonce: number;
     categories?: string[];
@@ -159,6 +153,67 @@ const EVENT_CONFIG: Record<string, {
     dotCls: "bg-slate-100 border-slate-400 dark:bg-slate-900/60 dark:border-slate-700",
     typeCls: "text-slate-700 dark:text-slate-400",
   },
+  // Types produced by the Claude Code and Codex adapters.
+  "assistant.thinking": {
+    label: "Thinking",
+    dotCls: "bg-indigo-100 border-indigo-400 dark:bg-indigo-900/60 dark:border-indigo-700",
+    typeCls: "text-indigo-700 dark:text-indigo-400",
+  },
+  "session.error": {
+    label: "Error",
+    dotCls: "bg-red-100 border-red-400 dark:bg-red-900/60 dark:border-red-700",
+    typeCls: "text-red-700 dark:text-red-400",
+  },
+  "context.attachment": {
+    label: "Attachment",
+    dotCls: "bg-stone-100 border-stone-400 dark:bg-stone-900/60 dark:border-stone-700",
+    typeCls: "text-stone-700 dark:text-stone-400",
+  },
+  "file.patch_applied": {
+    label: "Patch Applied",
+    dotCls: "bg-emerald-100 border-emerald-400 dark:bg-emerald-900/60 dark:border-emerald-700",
+    typeCls: "text-emerald-700 dark:text-emerald-400",
+  },
+  "web.search": {
+    label: "Web Search",
+    dotCls: "bg-blue-100 border-blue-400 dark:bg-blue-900/60 dark:border-blue-700",
+    typeCls: "text-blue-700 dark:text-blue-400",
+  },
+  "session.turn_context": {
+    label: "Turn Context",
+    dotCls: "bg-fuchsia-100 border-fuchsia-400 dark:bg-fuchsia-900/60 dark:border-fuchsia-700",
+    typeCls: "text-fuchsia-700 dark:text-fuchsia-400",
+  },
+  "session.world_state": {
+    label: "World State",
+    dotCls: "bg-fuchsia-100 border-fuchsia-400 dark:bg-fuchsia-900/60 dark:border-fuchsia-700",
+    typeCls: "text-fuchsia-700 dark:text-fuchsia-400",
+  },
+  "session.mode_change": {
+    label: "Mode Change",
+    dotCls: "bg-violet-100 border-violet-400 dark:bg-violet-900/60 dark:border-violet-700",
+    typeCls: "text-violet-700 dark:text-violet-400",
+  },
+  "session.turn_aborted": {
+    label: "Turn Aborted",
+    dotCls: "bg-orange-100 border-orange-400 dark:bg-orange-900/60 dark:border-orange-700",
+    typeCls: "text-orange-700 dark:text-orange-400",
+  },
+  "session.rollback": {
+    label: "Rollback",
+    dotCls: "bg-orange-100 border-orange-400 dark:bg-orange-900/60 dark:border-orange-700",
+    typeCls: "text-orange-700 dark:text-orange-400",
+  },
+  "subagent.activity": {
+    label: "Subagent",
+    dotCls: "bg-zinc-100 border-zinc-400 dark:bg-zinc-900/60 dark:border-zinc-700",
+    typeCls: "text-zinc-700 dark:text-zinc-400",
+  },
+  "subagent.message": {
+    label: "Subagent Message",
+    dotCls: "bg-zinc-100 border-zinc-400 dark:bg-zinc-900/60 dark:border-zinc-700",
+    typeCls: "text-zinc-700 dark:text-zinc-400",
+  },
 };
 
 const DEFAULT_CONFIG = {
@@ -214,6 +269,21 @@ const CATEGORY_VISUAL: Record<string, { dotCls: string; typeCls: string; chipCls
     typeCls: "text-zinc-700 dark:text-zinc-400",
     chipCls: "border-zinc-300 bg-zinc-100 text-zinc-800 dark:border-zinc-700 dark:bg-zinc-900/60 dark:text-zinc-300",
   },
+  context: {
+    dotCls: "bg-stone-100 border-stone-400 dark:bg-stone-900/60 dark:border-stone-700",
+    typeCls: "text-stone-700 dark:text-stone-400",
+    chipCls: "border-stone-300 bg-stone-100 text-stone-800 dark:border-stone-700 dark:bg-stone-900/60 dark:text-stone-300",
+  },
+  file: {
+    dotCls: "bg-emerald-100 border-emerald-400 dark:bg-emerald-900/60 dark:border-emerald-700",
+    typeCls: "text-emerald-700 dark:text-emerald-400",
+    chipCls: "border-emerald-300 bg-emerald-100 text-emerald-800 dark:border-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300",
+  },
+  web: {
+    dotCls: "bg-blue-100 border-blue-400 dark:bg-blue-900/60 dark:border-blue-700",
+    typeCls: "text-blue-700 dark:text-blue-400",
+    chipCls: "border-blue-300 bg-blue-100 text-blue-800 dark:border-blue-800 dark:bg-blue-900/50 dark:text-blue-300",
+  },
 };
 
 /** Events rendered per page; the rest load on demand. */
@@ -243,6 +313,18 @@ const EVENT_TYPE_HELP: Record<string, string> = {
   "hook.end": "Lifecycle hook execution completed with success/failure state.",
   "subagent.deselected": "Subagent focus was cleared and control returned to the main agent context.",
   "system.message": "System-level instruction/context block injected into the conversation runtime.",
+  "assistant.thinking": "Extended reasoning the model produced before answering. Billed as output tokens.",
+  "session.error": "API or transport error. Each retry re-sends the full request context.",
+  "context.attachment": "Context the runtime injected automatically: file snapshots, reminders, tool or skill listings.",
+  "file.patch_applied": "A patch the agent applied to the workspace, with the files it touched.",
+  "web.search": "Web search issued by the model; results are added to the conversation context.",
+  "session.turn_context": "Per-turn runtime configuration: model, effort, sandbox and approval policy.",
+  "session.world_state": "Snapshot of the workspace the runtime handed to the model.",
+  "session.mode_change": "Interaction or permission mode switched during the session.",
+  "session.turn_aborted": "The turn was interrupted before it completed.",
+  "session.rollback": "Conversation was rolled back by a number of turns.",
+  "subagent.activity": "Activity reported by a subagent working under the main agent.",
+  "subagent.message": "Message passed between agents.",
 };
 
 function formatTime(iso: string) {
@@ -267,7 +349,7 @@ function splitEventType(type: string) {
   };
 }
 
-function eventHasTokenUsage(event: CopilotEvent): boolean {
+function eventHasTokenUsage(event: AgentEvent): boolean {
   const data = event.data as Record<string, unknown>;
 
   const directOutput = data.outputTokens;
@@ -731,6 +813,8 @@ function SessionBinaryAssetCard({ data }: { data: Record<string, unknown> }) {
 }
 
 function UsageCheckpointCard({ data }: { data: Record<string, unknown> }) {
+  const usage = data.usage as Record<string, number> | undefined;
+  const contextWindow = data.contextWindow as number | undefined;
   const totalNanoAiu = data.totalNanoAiu as number | undefined;
   const totalPremiumRequests = data.totalPremiumRequests as number | undefined;
   const modelCacheState = data.modelCacheState as unknown[] | undefined;
@@ -738,6 +822,33 @@ function UsageCheckpointCard({ data }: { data: Record<string, unknown> }) {
 
   return (
     <div className="space-y-2">
+      {usage && (
+        <div className="flex flex-wrap items-center gap-1.5 text-xs">
+          {[
+            ["in", usage.inputTokens],
+            ["cached", usage.cachedInputTokens],
+            ["out", usage.outputTokens],
+            ["reasoning", usage.reasoningTokens],
+          ]
+            .filter(([, value]) => typeof value === "number" && value > 0)
+            .map(([label, value]) => (
+              <span
+                key={label as string}
+                className="inline-flex items-center gap-1 rounded-full border border-teal-300 bg-teal-100 px-2 py-0.5 text-teal-700 dark:border-teal-800 dark:bg-teal-950 dark:text-teal-300"
+              >
+                <span className="opacity-60">{label}</span>
+                <span className="font-mono font-semibold">
+                  {formatCompactNumber(value as number)}
+                </span>
+              </span>
+            ))}
+          {contextWindow && (
+            <span className="text-muted-foreground">
+              window {formatCompactNumber(contextWindow)}
+            </span>
+          )}
+        </div>
+      )}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-xs">
         {aiu !== undefined && (
           <div className="rounded border border-teal-200 dark:border-teal-900 px-2 py-1 bg-teal-100/60 dark:bg-teal-950/25">
@@ -911,6 +1022,153 @@ function AssistantTurnCard({ data, type }: { data: Record<string, unknown>; type
   );
 }
 
+function ThinkingCard({ data }: { data: Record<string, unknown> }) {
+  const content = (data.content as string) || "";
+  const charLength = (data.charLength as number) ?? content.length;
+  const [expanded, setExpanded] = useState(false);
+  const preview = content.slice(0, 400);
+  const hasMore = content.length > 400;
+
+  if (!content) {
+    return (
+      <p className="text-xs text-muted-foreground">
+        Reasoning was recorded but its content is encrypted in the transcript.
+      </p>
+    );
+  }
+
+  return (
+    <div className="space-y-1.5">
+      <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+        Reasoning · {charLength.toLocaleString()} chars
+      </p>
+      <div className="text-sm italic leading-relaxed text-muted-foreground whitespace-pre-wrap">
+        {expanded ? content : preview}
+        {hasMore && !expanded && "…"}
+      </div>
+      {hasMore && (
+        <button
+          onClick={() => setExpanded(!expanded)}
+          className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline"
+        >
+          {expanded ? "Show less" : `Show more (${charLength.toLocaleString()} chars)`}
+        </button>
+      )}
+    </div>
+  );
+}
+
+function ErrorCard({ data }: { data: Record<string, unknown> }) {
+  const message = (data.message as string) || "Error";
+  const detail = data.detail as string | undefined;
+  return (
+    <div className="space-y-1.5">
+      <p className="text-sm font-medium text-destructive">{message}</p>
+      {detail && detail !== message && (
+        <p className="text-xs text-muted-foreground">{detail}</p>
+      )}
+    </div>
+  );
+}
+
+function AttachmentCard({ data }: { data: Record<string, unknown> }) {
+  const attachmentType = (data.attachmentType as string) || "attachment";
+  const charLength = (data.charLength as number) ?? 0;
+  const content = (data.content as string) || "";
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <div className="space-y-2">
+      <div className="flex flex-wrap items-center gap-2">
+        <Badge variant="secondary" className="text-xs font-mono">
+          {attachmentType}
+        </Badge>
+        {charLength > 0 && (
+          <span className="text-xs text-muted-foreground">
+            ~{Math.round(charLength / 4).toLocaleString()} tokens ·{" "}
+            {charLength.toLocaleString()} chars
+          </span>
+        )}
+      </div>
+      {content && (
+        <>
+          <pre className="max-h-56 overflow-auto whitespace-pre-wrap break-words font-mono text-xs leading-relaxed text-muted-foreground">
+            {expanded ? content : content.slice(0, 400)}
+            {!expanded && content.length > 400 && "…"}
+          </pre>
+          {content.length > 400 && (
+            <button
+              onClick={() => setExpanded(!expanded)}
+              className="text-xs text-stone-600 dark:text-stone-400 hover:underline"
+            >
+              {expanded ? "Show less" : "Show more"}
+            </button>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+function PatchAppliedCard({ data }: { data: Record<string, unknown> }) {
+  const success = data.success as boolean | undefined;
+  const changes = (data.changes as { file: string; type: string }[]) || [];
+  const stdout = (data.stdout as string) || "";
+
+  return (
+    <div className="space-y-2">
+      <div className="flex flex-wrap items-center gap-2">
+        <span
+          className={`rounded px-1.5 py-0.5 text-xs font-medium ${
+            success === false
+              ? "bg-red-100 text-red-700 dark:bg-red-900/60 dark:text-red-400"
+              : "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/60 dark:text-emerald-400"
+          }`}
+        >
+          {success === false ? "failed" : "applied"}
+        </span>
+        <span className="text-xs text-muted-foreground">
+          {changes.length} file{changes.length === 1 ? "" : "s"}
+        </span>
+      </div>
+      {changes.length > 0 && (
+        <ul className="space-y-1">
+          {changes.slice(0, 12).map((change) => (
+            <li key={change.file} className="flex items-center gap-2 text-xs">
+              <span className="rounded border border-emerald-300 bg-emerald-100/70 px-1 font-mono text-[10px] uppercase text-emerald-800 dark:border-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300">
+                {change.type}
+              </span>
+              <span className="truncate font-mono text-foreground/80" title={change.file}>
+                {change.file}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+      {stdout && (
+        <pre className="max-h-32 overflow-auto whitespace-pre-wrap font-mono text-xs text-muted-foreground">
+          {stdout}
+        </pre>
+      )}
+    </div>
+  );
+}
+
+function WebSearchCard({ data }: { data: Record<string, unknown> }) {
+  const query = (data.query as string) || "";
+  const resultCount = data.resultCount as number | undefined;
+  return (
+    <div className="space-y-1.5">
+      <p className="text-sm text-foreground">{query}</p>
+      {resultCount !== undefined && (
+        <p className="text-xs text-muted-foreground">
+          {resultCount} result{resultCount === 1 ? "" : "s"} returned
+        </p>
+      )}
+    </div>
+  );
+}
+
 function GenericDataCard({ data }: { data: Record<string, unknown> }) {
   const [expanded, setExpanded] = useState(false);
   const json = JSON.stringify(data, null, 2);
@@ -941,8 +1199,12 @@ function firstArg(input?: Record<string, unknown>) {
   if (!input) return "";
   for (const key of [
     "command",
+    "cmd",
+    "input",
+    "script",
     "filePath",
     "file_path",
+    "notebook_path",
     "path",
     "pattern",
     "query",
@@ -960,7 +1222,7 @@ function firstArg(input?: Record<string, unknown>) {
  * One-line description of an event, so the timeline can stay collapsed by
  * default and still be readable at a glance.
  */
-function eventSummary(event: CopilotEvent): { label: string; preview: string } {
+function eventSummary(event: AgentEvent): { label: string; preview: string } {
   const d = event.data;
   const fallback = EVENT_CONFIG[event.type]?.label ?? splitEventType(event.type).subCategory;
 
@@ -1055,7 +1317,14 @@ function eventSummary(event: CopilotEvent): { label: string; preview: string } {
           .filter(Boolean)
           .join(" · "),
       };
-    case "session.usage_checkpoint":
+    case "session.usage_checkpoint": {
+      const usage = d.usage as Record<string, number> | undefined;
+      if (usage) {
+        return {
+          label: "Usage checkpoint",
+          preview: `in ${formatCompactNumber(usage.inputTokens ?? 0)} · out ${formatCompactNumber(usage.outputTokens ?? 0)}`,
+        };
+      }
       return {
         label: "Usage checkpoint",
         preview:
@@ -1063,6 +1332,7 @@ function eventSummary(event: CopilotEvent): { label: string; preview: string } {
             ? `${d.totalPremiumRequests} premium req`
             : "usage snapshot",
       };
+    }
     case "session.model_change":
       return {
         label: "Model change",
@@ -1111,34 +1381,107 @@ function eventSummary(event: CopilotEvent): { label: string; preview: string } {
     }
     case "subagent.deselected":
       return { label: "Subagent", preview: "focus returned to main agent" };
+    case "subagent.activity":
+      return {
+        label: "Subagent",
+        preview: [d.kind as string, d.agentPath as string].filter(Boolean).join(" · "),
+      };
+    case "assistant.thinking": {
+      const content = shorten(d.content);
+      const chars = (d.charLength as number) ?? 0;
+      return {
+        label: "Thinking",
+        preview: content || (chars ? `${chars.toLocaleString()} chars (encrypted)` : "reasoning"),
+      };
+    }
+    case "session.error":
+      return { label: "Error", preview: shorten(d.detail || d.message, 90) };
+    case "context.attachment": {
+      const chars = (d.charLength as number) ?? 0;
+      return {
+        label: "Attachment",
+        preview: [
+          d.attachmentType as string,
+          chars ? `${chars.toLocaleString()} chars` : "",
+        ]
+          .filter(Boolean)
+          .join(" · "),
+      };
+    }
+    case "file.patch_applied": {
+      const changes = (d.changes as { file: string }[]) ?? [];
+      const first = changes[0]?.file.split("/").pop();
+      return {
+        label: "Patch",
+        preview:
+          changes.length > 1
+            ? `${changes.length} files · ${first}, …`
+            : first ?? (d.success === false ? "failed" : "applied"),
+      };
+    }
+    case "web.search":
+      return { label: "Web search", preview: shorten(d.query, 90) };
+    case "session.turn_context":
+      return {
+        label: "Turn context",
+        preview: [d.model as string, d.effort ? `effort ${d.effort}` : ""]
+          .filter(Boolean)
+          .join(" · "),
+      };
+    case "session.world_state":
+      return {
+        label: "World state",
+        preview: `${((d.charLength as number) ?? 0).toLocaleString()} chars`,
+      };
+    case "session.mode_change":
+      return { label: "Mode", preview: String(d.mode ?? "changed") };
+    case "session.turn_aborted":
+      return {
+        label: "Turn aborted",
+        preview: [d.reason as string, d.durationMs ? `${Math.round((d.durationMs as number) / 1000)}s` : ""]
+          .filter(Boolean)
+          .join(" · "),
+      };
+    case "session.rollback":
+      return { label: "Rollback", preview: `${d.turns ?? "?"} turn(s)` };
     default:
       return { label: fallback, preview: shorten(JSON.stringify(d), 90) };
   }
 }
 
 /** Token counts to show inline on a collapsed row, if the event reports any. */
-function eventTokenBadge(event: CopilotEvent): { input: number; output: number } | null {
+function eventTokenBadge(event: AgentEvent): { input: number; output: number } | null {
   const d = event.data;
   const details = d.tokenDetails as Record<string, { tokenCount?: number }> | undefined;
+  const totals = d.sessionTotals as Record<string, number> | undefined;
+  const summary = d.usageSummary as Record<string, number> | undefined;
   const input =
     (typeof d.inputTokens === "number" ? d.inputTokens : 0) ||
-    (details?.input?.tokenCount ?? 0);
+    (details?.input?.tokenCount ?? 0) ||
+    (summary?.inputTokens ?? 0) ||
+    (totals?.inputTokens ?? 0);
   const output =
     (typeof d.outputTokens === "number" ? d.outputTokens : 0) ||
-    (details?.output?.tokenCount ?? 0);
+    (details?.output?.tokenCount ?? 0) ||
+    (summary?.outputTokens ?? 0) ||
+    (totals?.outputTokens ?? 0);
   if (input === 0 && output === 0) return null;
   return { input, output };
 }
 
 /** Conversation turns read best already open; the machinery starts collapsed. */
-const DEFAULT_OPEN_TYPES = new Set(["user.message", "assistant.message"]);
+const DEFAULT_OPEN_TYPES = new Set([
+  "user.message",
+  "assistant.message",
+  "assistant.thinking",
+]);
 
 function EventCard({
   event,
   prevTimestamp,
   expandAll,
 }: {
-  event: CopilotEvent;
+  event: AgentEvent;
   prevTimestamp?: string;
   /** Bumped by the toolbar; `open` forces every row open, `closed` closes them. */
   expandAll: { nonce: number; mode: "open" | "closed" } | null;
@@ -1221,6 +1564,16 @@ function EventCard({
         return <CompactionCompleteCard data={event.data} />;
       case "system.message":
         return <SystemMessageCard data={event.data} />;
+      case "assistant.thinking":
+        return <ThinkingCard data={event.data} />;
+      case "session.error":
+        return <ErrorCard data={event.data} />;
+      case "context.attachment":
+        return <AttachmentCard data={event.data} />;
+      case "file.patch_applied":
+        return <PatchAppliedCard data={event.data} />;
+      case "web.search":
+        return <WebSearchCard data={event.data} />;
       case "permission.requested": {
         const pr = event.data.permissionRequest as Record<string, unknown>;
         return pr ? (
@@ -1396,6 +1749,13 @@ function getCategoryChipClass(category: string) {
   return CATEGORY_VISUAL[category]?.chipCls || "border-border bg-muted text-muted-foreground";
 }
 
+/** Runtime-injected context, hidden together by the toolbar toggle. */
+const INJECTED_CONTEXT_TYPES = new Set([
+  "system.message",
+  "context.attachment",
+  "session.world_state",
+]);
+
 function getTypeChipClass(type: string) {
   const { category } = splitEventType(type);
   return getCategoryChipClass(category);
@@ -1425,8 +1785,12 @@ export function EventsTimeline({ events, focusRequest }: Props) {
     });
   }, [events]);
 
+  // Injected context — system prompts and auto-attached blocks — is bulky and
+  // rarely what you are reading the timeline for, so it hides as one group.
   const visibleBySystem = useMemo(() => {
-    return typedEvents.filter((event) => showSystem || event.type !== "system.message");
+    return typedEvents.filter(
+      (event) => showSystem || !INJECTED_CONTEXT_TYPES.has(event.type),
+    );
   }, [typedEvents, showSystem]);
 
   const categoryCounts = useMemo(() => {
@@ -1515,7 +1879,7 @@ export function EventsTimeline({ events, focusRequest }: Props) {
   );
 
   const groups = useMemo(() => {
-    const g: { date: string; events: CopilotEvent[] }[] = [];
+    const g: { date: string; events: AgentEvent[] }[] = [];
     for (const ev of shown) {
       const d = formatDate(ev.timestamp);
       const last = g[g.length - 1];
@@ -1587,8 +1951,8 @@ export function EventsTimeline({ events, focusRequest }: Props) {
             active={!showSystem}
             onClick={() => setShowSystem(!showSystem)}
             icon={Filter}
-            label="Hide system"
-            title="Hide system.message events, which are usually large VS Code context blocks"
+            label="Hide context"
+            title="Hide system prompts, auto-attached context and world-state snapshots"
           />
           <ToolbarToggle
             active={onlyTokenEvents}

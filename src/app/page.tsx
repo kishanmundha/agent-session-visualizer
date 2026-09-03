@@ -18,6 +18,8 @@ import { SessionCardSkeleton } from "@/components/common/skeleton";
 import { ThemeToggle } from "@/components/common/theme-toggle";
 import { SessionCard, type SessionMeta } from "@/components/home/session-card";
 import { LogsViewer, type LogFile } from "@/components/home/logs-viewer";
+import { providerStyle } from "@/lib/provider-meta";
+import type { ProviderInfo } from "@/components/session/types";
 import { cn } from "@/lib/utils";
 
 type SortKey = "recent" | "oldest" | "tokens" | "events" | "name";
@@ -40,6 +42,8 @@ function sessionLabel(s: SessionMeta) {
 
 export default function HomePage() {
   const [sessions, setSessions] = useState<SessionMeta[]>([]);
+  const [providers, setProviders] = useState<ProviderInfo[]>([]);
+  const [provider, setProvider] = useState<string>("all");
   const [logs, setLogs] = useState<LogFile[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -53,22 +57,27 @@ export default function HomePage() {
     let cancelled = false;
     void (async () => {
       try {
-        const [sessionsRes, logsRes] = await Promise.all([
+        const [sessionsRes, logsRes, providersRes] = await Promise.all([
           fetch("/api/sessions"),
           fetch("/api/logs"),
+          fetch("/api/providers"),
         ]);
-        if (!sessionsRes.ok || !logsRes.ok) throw new Error("Request failed");
-        const [nextSessions, nextLogs] = await Promise.all([
+        if (!sessionsRes.ok || !logsRes.ok || !providersRes.ok) {
+          throw new Error("Request failed");
+        }
+        const [nextSessions, nextLogs, nextProviders] = await Promise.all([
           sessionsRes.json(),
           logsRes.json(),
+          providersRes.json(),
         ]);
         if (cancelled) return;
         setSessions(nextSessions);
         setLogs(nextLogs);
+        setProviders(nextProviders);
       } catch {
         if (!cancelled) {
           setError(
-            "Could not read ~/.copilot. Is the directory present and readable?",
+            "Could not read the agent session directories. Are ~/.copilot, ~/.claude or ~/.codex present and readable?",
           );
         }
       } finally {
@@ -86,10 +95,23 @@ export default function HomePage() {
     setReloadToken((t) => t + 1);
   }
 
+  const availableProviders = useMemo(
+    () => providers.filter((p) => p.available),
+    [providers],
+  );
+
+  const providerSessions = useMemo(
+    () =>
+      provider === "all"
+        ? sessions
+        : sessions.filter((s) => s.provider === provider),
+    [sessions, provider],
+  );
+
   const filteredSessions = useMemo(() => {
     const q = search.trim().toLowerCase();
     const matched = q
-      ? sessions.filter(
+      ? providerSessions.filter(
           (s) =>
             s.name?.toLowerCase().includes(q) ||
             s.title?.toLowerCase().includes(q) ||
@@ -98,7 +120,7 @@ export default function HomePage() {
             s.cwd?.toLowerCase().includes(q) ||
             s.id.toLowerCase().includes(q),
         )
-      : sessions;
+      : providerSessions;
 
     // The API already returns updated_at desc, so "recent" needs no re-sort.
     if (sort === "recent") return matched;
@@ -113,7 +135,7 @@ export default function HomePage() {
       case "name":
         return sorted.sort((a, b) => sessionLabel(a).localeCompare(sessionLabel(b)));
     }
-  }, [sessions, search, sort]);
+  }, [providerSessions, search, sort]);
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -125,10 +147,12 @@ export default function HomePage() {
             </span>
             <div className="min-w-0">
               <h1 className="truncate text-sm font-semibold leading-none tracking-tight">
-                Copilot <span className="text-brand">Session</span> Visualizer
+                Agent <span className="text-brand">Session</span> Visualizer
               </h1>
-              <p className="mt-1 font-mono text-xs text-muted-foreground">
-                ~/.copilot
+              <p className="mt-1 truncate font-mono text-xs text-muted-foreground">
+                {availableProviders.length > 0
+                  ? availableProviders.map((p) => p.rootDir).join("  ·  ")
+                  : "no agent directories found"}
               </p>
             </div>
           </div>
@@ -143,7 +167,7 @@ export default function HomePage() {
                 aria-hidden
               />
               <span className="font-medium tabular-nums text-foreground">
-                {sessions.length}
+                {providerSessions.length}
               </span>
               sessions
             </span>
@@ -210,6 +234,30 @@ export default function HomePage() {
           </TabsList>
 
           <TabsContent value="sessions">
+            {availableProviders.length > 1 && (
+              <div
+                className="mb-3 flex flex-wrap items-center gap-2"
+                role="group"
+                aria-label="Filter by agent"
+              >
+                <ProviderChip
+                  active={provider === "all"}
+                  onClick={() => setProvider("all")}
+                  label="All agents"
+                  count={sessions.length}
+                />
+                {availableProviders.map((p) => (
+                  <ProviderChip
+                    key={p.id}
+                    active={provider === p.id}
+                    onClick={() => setProvider(p.id)}
+                    label={providerStyle(p.id).shortLabel}
+                    count={p.sessionCount ?? 0}
+                    dotCls={providerStyle(p.id).dotCls}
+                  />
+                ))}
+              </div>
+            )}
             <div className="mb-4 flex flex-wrap items-center gap-3">
               <SearchInput
                 value={search}
@@ -237,7 +285,7 @@ export default function HomePage() {
               <span className="ml-auto text-xs tabular-nums text-muted-foreground">
                 {loading
                   ? "Loading…"
-                  : `${filteredSessions.length} of ${sessions.length}`}
+                  : `${filteredSessions.length} of ${providerSessions.length}`}
               </span>
             </div>
 
@@ -245,7 +293,9 @@ export default function HomePage() {
               {loading ? (
                 Array.from({ length: 5 }, (_, i) => <SessionCardSkeleton key={i} />)
               ) : filteredSessions.length > 0 ? (
-                filteredSessions.map((s) => <SessionCard key={s.id} session={s} />)
+                filteredSessions.map((s) => (
+                  <SessionCard key={`${s.provider}:${s.id}`} session={s} />
+                ))
               ) : (
                 <EmptyState
                   icon={Inbox}
@@ -253,7 +303,7 @@ export default function HomePage() {
                   description={
                     search
                       ? `Nothing matches “${search}”. Try a repository name, branch or session id.`
-                      : "Sessions appear here once GitHub Copilot CLI writes to ~/.copilot/session-state."
+                      : "Sessions appear here once Copilot, Claude Code or Codex writes a transcript to your home directory."
                   }
                   action={
                     search ? (
@@ -279,5 +329,37 @@ export default function HomePage() {
 
       <ScrollToTop />
     </div>
+  );
+}
+
+function ProviderChip({
+  active,
+  onClick,
+  label,
+  count,
+  dotCls,
+}: {
+  active: boolean;
+  onClick: () => void;
+  label: string;
+  count: number;
+  dotCls?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={cn(
+        "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring",
+        active
+          ? "border-brand/50 bg-brand/10 text-foreground"
+          : "border-border bg-background text-muted-foreground hover:text-foreground",
+      )}
+    >
+      {dotCls && <span className={cn("size-1.5 rounded-full", dotCls)} aria-hidden />}
+      {label}
+      <span className="rounded bg-foreground/10 px-1.5 tabular-nums">{count}</span>
+    </button>
   );
 }

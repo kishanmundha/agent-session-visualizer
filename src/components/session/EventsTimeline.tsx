@@ -209,6 +209,21 @@ const EVENT_CONFIG: Record<string, {
     dotCls: "bg-zinc-100 border-zinc-400 dark:bg-zinc-900/60 dark:border-zinc-700",
     typeCls: "text-zinc-700 dark:text-zinc-400",
   },
+  "session.plan_changed": {
+    label: "Plan Changed",
+    dotCls: "bg-fuchsia-100 border-fuchsia-400 dark:bg-fuchsia-900/60 dark:border-fuchsia-700",
+    typeCls: "text-fuchsia-700 dark:text-fuchsia-400",
+  },
+  "system.notification": {
+    label: "Notification",
+    dotCls: "bg-slate-100 border-slate-400 dark:bg-slate-900/60 dark:border-slate-700",
+    typeCls: "text-slate-700 dark:text-slate-400",
+  },
+  "subagent.session_start": {
+    label: "Subagent Start",
+    dotCls: "bg-zinc-100 border-zinc-400 dark:bg-zinc-900/60 dark:border-zinc-700",
+    typeCls: "text-zinc-700 dark:text-zinc-400",
+  },
   "subagent.message": {
     label: "Subagent Message",
     dotCls: "bg-zinc-100 border-zinc-400 dark:bg-zinc-900/60 dark:border-zinc-700",
@@ -325,6 +340,9 @@ const EVENT_TYPE_HELP: Record<string, string> = {
   "session.rollback": "Conversation was rolled back by a number of turns.",
   "subagent.activity": "Activity reported by a subagent working under the main agent.",
   "subagent.message": "Message passed between agents.",
+  "subagent.session_start": "A subagent thread started inside this session.",
+  "session.plan_changed": "The agent created or updated its working plan.",
+  "system.notification": "Runtime notification injected into the conversation, such as a background shell finishing.",
 };
 
 function formatTime(iso: string) {
@@ -1071,41 +1089,120 @@ function ErrorCard({ data }: { data: Record<string, unknown> }) {
   );
 }
 
-function AttachmentCard({ data }: { data: Record<string, unknown> }) {
-  const attachmentType = (data.attachmentType as string) || "attachment";
-  const charLength = (data.charLength as number) ?? 0;
-  const content = (data.content as string) || "";
+/** Chip list that stays scannable when a delta adds a hundred tool names. */
+function NameChips({ items, label }: { items: string[]; label?: string }) {
   const [expanded, setExpanded] = useState(false);
+  if (items.length === 0) return null;
+  const visible = expanded ? items : items.slice(0, 12);
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-1">
+      {label && (
+        <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+          {items.length} {label}
+        </p>
+      )}
+      <div className="flex flex-wrap gap-1">
+        {visible.map((item) => (
+          <span
+            key={item}
+            className="max-w-full truncate rounded border border-border bg-muted/60 px-1.5 py-0.5 font-mono text-[11px] text-foreground/80"
+            title={item}
+          >
+            {item}
+          </span>
+        ))}
+        {!expanded && items.length > visible.length && (
+          <button
+            onClick={() => setExpanded(true)}
+            className="rounded px-1.5 py-0.5 text-[11px] text-muted-foreground hover:text-foreground hover:underline"
+          >
+            +{items.length - visible.length} more
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** Body text that starts clipped; used by the context-heavy cards. */
+function ExpandableText({
+  text,
+  charLength,
+  limit = 400,
+  mono = true,
+  accentCls = "text-muted-foreground",
+}: {
+  text: string;
+  charLength?: number;
+  limit?: number;
+  mono?: boolean;
+  accentCls?: string;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  if (!text) return null;
+  const hasMore = text.length > limit;
+  const total = charLength ?? text.length;
+
+  return (
+    <div className="space-y-1">
+      <pre
+        className={cn(
+          "max-h-72 overflow-auto whitespace-pre-wrap break-words text-xs leading-relaxed text-foreground/80",
+          mono && "font-mono",
+        )}
+      >
+        {expanded ? text : text.slice(0, limit)}
+        {!expanded && hasMore && "…"}
+      </pre>
+      {hasMore && (
+        <button
+          onClick={() => setExpanded(!expanded)}
+          className={cn("text-xs hover:underline", accentCls)}
+        >
+          {expanded ? "Show less" : `Show more (${total.toLocaleString()} chars)`}
+        </button>
+      )}
+    </div>
+  );
+}
+
+function AttachmentCard({ data }: { data: Record<string, unknown> }) {
+  const attachmentType = (data.attachmentType as string) || "attachment";
+  const label = (data.label as string) || attachmentType;
+  const subject = data.subject as string | undefined;
+  const items = (data.items as string[]) ?? [];
+  const itemsLabel = data.itemsLabel as string | undefined;
+  const charLength = (data.charLength as number) ?? 0;
+  const content = (data.content as string) || "";
+
+  return (
+    <div className="space-y-2.5">
       <div className="flex flex-wrap items-center gap-2">
-        <Badge variant="secondary" className="text-xs font-mono">
-          {attachmentType}
+        <Badge variant="secondary" className="text-xs">
+          {label}
         </Badge>
+        <span className="font-mono text-[11px] text-muted-foreground">
+          {attachmentType}
+        </span>
         {charLength > 0 && (
           <span className="text-xs text-muted-foreground">
-            ~{Math.round(charLength / 4).toLocaleString()} tokens ·{" "}
-            {charLength.toLocaleString()} chars
+            ~{Math.round(charLength / 4).toLocaleString()} tokens
           </span>
         )}
       </div>
-      {content && (
-        <>
-          <pre className="max-h-56 overflow-auto whitespace-pre-wrap break-words font-mono text-xs leading-relaxed text-muted-foreground">
-            {expanded ? content : content.slice(0, 400)}
-            {!expanded && content.length > 400 && "…"}
-          </pre>
-          {content.length > 400 && (
-            <button
-              onClick={() => setExpanded(!expanded)}
-              className="text-xs text-stone-600 dark:text-stone-400 hover:underline"
-            >
-              {expanded ? "Show less" : "Show more"}
-            </button>
-          )}
-        </>
+
+      {subject && (
+        <p className="break-all font-mono text-xs text-foreground/80">{subject}</p>
       )}
+
+      <NameChips items={items} label={itemsLabel} />
+
+      <ExpandableText
+        text={content}
+        charLength={charLength}
+        accentCls="text-stone-600 dark:text-stone-400"
+      />
     </div>
   );
 }
@@ -1165,6 +1262,177 @@ function WebSearchCard({ data }: { data: Record<string, unknown> }) {
           {resultCount} result{resultCount === 1 ? "" : "s"} returned
         </p>
       )}
+    </div>
+  );
+}
+
+/** Small labelled facts, used by the runtime-state cards. */
+function FactGrid({ facts }: { facts: [string, unknown][] }) {
+  const shown = facts.filter(([, value]) => value !== undefined && value !== null && value !== "");
+  if (shown.length === 0) return null;
+  return (
+    <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+      {shown.map(([label, value]) => (
+        <div
+          key={label}
+          className="flex items-center justify-between gap-2 rounded border border-border bg-muted/40 px-2 py-1 text-xs"
+        >
+          <span className="text-muted-foreground">{label}</span>
+          <span className="min-w-0 truncate font-mono text-foreground" title={String(value)}>
+            {String(value)}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ModeChangeCard({ data }: { data: Record<string, unknown> }) {
+  const mode = (data.mode as string) || "unknown";
+  return (
+    <div className="flex items-center gap-2 text-sm">
+      <span className="text-muted-foreground">Mode set to</span>
+      <Badge variant="secondary" className="font-mono">
+        {mode}
+      </Badge>
+    </div>
+  );
+}
+
+function TurnContextCard({ data }: { data: Record<string, unknown> }) {
+  const sandbox = data.sandboxPolicy as Record<string, unknown> | undefined;
+  const approval = data.approvalPolicy as Record<string, unknown> | undefined;
+  const writableRoots = (sandbox?.writable_roots as string[]) ?? [];
+
+  return (
+    <div className="space-y-2">
+      <FactGrid
+        facts={[
+          ["model", data.model],
+          ["effort", data.effort],
+          ["personality", data.personality],
+          ["sandbox", sandbox?.type],
+          ["network", sandbox?.network_access === true ? "enabled" : "restricted"],
+          ["approval", approval ? Object.keys(approval)[0] : undefined],
+          ["cwd", data.cwd],
+        ]}
+      />
+      {writableRoots.length > 0 && (
+        <NameChips items={writableRoots} label="writable roots" />
+      )}
+    </div>
+  );
+}
+
+function WorldStateCard({ data }: { data: Record<string, unknown> }) {
+  const sections = (data.sections as string[]) ?? [];
+  const content = (data.content as string) || "";
+  const charLength = (data.charLength as number) ?? 0;
+
+  return (
+    <div className="space-y-2.5">
+      <FactGrid
+        facts={[
+          ["cwd", data.cwd],
+          ["shell", data.shell],
+          ["date", data.currentDate],
+          ["timezone", data.timezone],
+          ["snapshot", data.full === true ? "full" : "delta"],
+          ["size", charLength ? `${charLength.toLocaleString()} chars` : undefined],
+        ]}
+      />
+      <NameChips items={sections} label="state sections" />
+      <ExpandableText text={content} charLength={charLength} />
+    </div>
+  );
+}
+
+function SubagentCard({ data, type }: { data: Record<string, unknown>; type: string }) {
+  if (type === "subagent.session_start") {
+    return (
+      <FactGrid
+        facts={[
+          ["agent", data.agentNickname],
+          ["path", data.agentPath],
+          ["thread", data.sessionId],
+          ["parent", data.parentThreadId],
+          ["cwd", data.cwd],
+        ]}
+      />
+    );
+  }
+  if (type === "subagent.activity") {
+    return (
+      <FactGrid
+        facts={[
+          ["activity", data.kind],
+          ["path", data.agentPath],
+          ["thread", data.agentThreadId],
+        ]}
+      />
+    );
+  }
+  return <GenericDataCard data={data} />;
+}
+
+function TurnAbortedCard({ data }: { data: Record<string, unknown> }) {
+  const durationMs = data.durationMs as number | undefined;
+  return (
+    <div className="flex flex-wrap items-center gap-2 text-xs">
+      <span className="rounded bg-orange-100 px-1.5 py-0.5 font-medium text-orange-800 dark:bg-orange-900/60 dark:text-orange-300">
+        {(data.reason as string) ?? "aborted"}
+      </span>
+      {durationMs !== undefined && (
+        <span className="text-muted-foreground">
+          after{" "}
+          <span className="font-mono text-foreground">
+            {(durationMs / 1000).toFixed(1)}s
+          </span>
+        </span>
+      )}
+      {data.turnId !== undefined && (
+        <span className="font-mono text-muted-foreground">turn {String(data.turnId)}</span>
+      )}
+    </div>
+  );
+}
+
+function RollbackCard({ data }: { data: Record<string, unknown> }) {
+  const turns = data.turns as number | undefined;
+  return (
+    <p className="text-sm text-foreground">
+      Conversation rolled back{" "}
+      <span className="font-semibold">{turns ?? "?"}</span> turn
+      {turns === 1 ? "" : "s"}.
+    </p>
+  );
+}
+
+function PlanChangedCard({ data }: { data: Record<string, unknown> }) {
+  return (
+    <div className="flex items-center gap-2 text-sm">
+      <span className="text-muted-foreground">Plan</span>
+      <Badge variant="secondary" className="font-mono">
+        {(data.operation as string) ?? "changed"}
+      </Badge>
+    </div>
+  );
+}
+
+function NotificationCard({ data }: { data: Record<string, unknown> }) {
+  const kind = data.kind as Record<string, unknown> | undefined;
+  const content = (data.content as string) || "";
+  return (
+    <div className="space-y-2">
+      <FactGrid
+        facts={[
+          ["kind", kind?.type],
+          ["shell", kind?.shellId],
+          ["exit code", kind?.exitCode],
+          ["description", kind?.description],
+        ]}
+      />
+      <ExpandableText text={content} mono={false} />
     </div>
   );
 }
@@ -1386,6 +1654,25 @@ function eventSummary(event: AgentEvent): { label: string; preview: string } {
         label: "Subagent",
         preview: [d.kind as string, d.agentPath as string].filter(Boolean).join(" · "),
       };
+    case "subagent.session_start":
+      return {
+        label: "Subagent start",
+        preview: [d.agentNickname as string, d.agentPath as string, d.cwd as string]
+          .filter(Boolean)
+          .join(" · "),
+      };
+    case "session.plan_changed":
+      return { label: "Plan", preview: String(d.operation ?? "changed") };
+    case "system.notification": {
+      const kind = d.kind as Record<string, unknown> | undefined;
+      return {
+        label: "Notification",
+        preview:
+          [kind?.type as string, kind?.description as string]
+            .filter(Boolean)
+            .join(" · ") || shorten(d.content, 90),
+      };
+    }
     case "assistant.thinking": {
       const content = shorten(d.content);
       const chars = (d.charLength as number) ?? 0;
@@ -1398,12 +1685,14 @@ function eventSummary(event: AgentEvent): { label: string; preview: string } {
       return { label: "Error", preview: shorten(d.detail || d.message, 90) };
     case "context.attachment": {
       const chars = (d.charLength as number) ?? 0;
+      const itemCount = (d.itemCount as number) ?? 0;
+      const detail =
+        (d.subject as string) ||
+        (itemCount ? `${itemCount} ${d.itemsLabel ?? "items"}` : "") ||
+        shorten(d.content, 70);
       return {
-        label: "Attachment",
-        preview: [
-          d.attachmentType as string,
-          chars ? `${chars.toLocaleString()} chars` : "",
-        ]
+        label: (d.label as string) || "Attachment",
+        preview: [detail, chars ? `${chars.toLocaleString()} chars` : ""]
           .filter(Boolean)
           .join(" · "),
       };
@@ -1431,7 +1720,14 @@ function eventSummary(event: AgentEvent): { label: string; preview: string } {
     case "session.world_state":
       return {
         label: "World state",
-        preview: `${((d.charLength as number) ?? 0).toLocaleString()} chars`,
+        preview: (() => {
+          const sections = ((d.sections as string[]) ?? []).length;
+          return [
+            d.full === true ? "full snapshot" : "delta",
+            `${sections} section${sections === 1 ? "" : "s"}`,
+            `${((d.charLength as number) ?? 0).toLocaleString()} chars`,
+          ].join(" · ");
+        })(),
       };
     case "session.mode_change":
       return { label: "Mode", preview: String(d.mode ?? "changed") };
@@ -1574,6 +1870,24 @@ function EventCard({
         return <PatchAppliedCard data={event.data} />;
       case "web.search":
         return <WebSearchCard data={event.data} />;
+      case "session.mode_change":
+        return <ModeChangeCard data={event.data} />;
+      case "session.turn_context":
+        return <TurnContextCard data={event.data} />;
+      case "session.world_state":
+        return <WorldStateCard data={event.data} />;
+      case "subagent.session_start":
+      case "subagent.activity":
+      case "subagent.message":
+        return <SubagentCard data={event.data} type={event.type} />;
+      case "session.turn_aborted":
+        return <TurnAbortedCard data={event.data} />;
+      case "session.rollback":
+        return <RollbackCard data={event.data} />;
+      case "session.plan_changed":
+        return <PlanChangedCard data={event.data} />;
+      case "system.notification":
+        return <NotificationCard data={event.data} />;
       case "permission.requested": {
         const pr = event.data.permissionRequest as Record<string, unknown>;
         return pr ? (

@@ -108,6 +108,11 @@ function normalize(raw: AgentEvent): AgentEvent {
     if (usage) data.usageSummary = usage;
   }
 
+  if (raw.type === "abort") {
+    // Same concept as Codex's turn_aborted; use one vocabulary for both.
+    return { ...raw, type: "session.turn_aborted", data };
+  }
+
   if (raw.type === "session.usage_checkpoint") {
     // Interim snapshot: only premium/AIU accounting, no token totals.
     data.premiumRequests = data.totalPremiumRequests;

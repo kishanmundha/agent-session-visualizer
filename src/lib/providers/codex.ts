@@ -170,9 +170,19 @@ function parseFile(filePath: string): ParsedSession {
       }
 
       case "world_state": {
-        const capped = capText(p.state);
+        const state = (p.state as Record<string, unknown>) ?? {};
+        const environments = state.environments as Record<string, unknown> | undefined;
+        const local = (environments?.environments as Record<string, Record<string, unknown>>)
+          ?.local;
+        const capped = capText(state);
         push(ts, "session.world_state", {
           full: p.full,
+          cwd: local?.cwd,
+          shell: local?.shell,
+          currentDate: environments?.current_date,
+          timezone: environments?.timezone,
+          // Which slices of runtime state were sent with this snapshot.
+          sections: Object.keys(state),
           charLength: capped.chars,
           truncated: capped.truncated,
           content: capped.text,

@@ -94,6 +94,143 @@ function decodeProjectDir(dirName: string): string {
 const FILE_ARG_KEYS = ["file_path", "notebook_path", "path", "filePath"];
 const EDIT_TOOLS = /^(Edit|Write|MultiEdit|NotebookEdit|Update)$/;
 
+/** Human labels for the attachment kinds Claude Code injects. */
+const ATTACHMENT_LABELS: Record<string, string> = {
+  deferred_tools_delta: "Tool catalog",
+  agent_listing_delta: "Agent listing",
+  mcp_instructions_delta: "MCP instructions",
+  skill_listing: "Skill listing",
+  auto_mode: "Auto mode",
+  total_tokens_reminder: "Token budget",
+  edited_text_file: "File edited outside the session",
+  nested_memory: "Memory file",
+  hook_additional_context: "Hook context",
+  queued_command: "Queued command",
+  task_reminder: "Task reminder",
+  command_permissions: "Command permissions",
+  remote_session_change: "Remote session",
+  file: "Attached file",
+  image: "Image",
+};
+
+function joinText(value: unknown): string {
+  if (Array.isArray(value)) return value.map((v) => joinText(v)).join("\n");
+  if (typeof value === "string") return value;
+  return value == null ? "" : JSON.stringify(value, null, 2);
+}
+
+function toNames(value: unknown): string[] {
+  return Array.isArray(value) ? value.map((v) => String(v)) : [];
+}
+
+/**
+ * Attachments are injected context with a different shape per kind. Flatten
+ * each into a common {label, subject, items, body} so the UI can render them
+ * as content rather than as raw JSON.
+ */
+function describeAttachment(
+  attachment: { type?: string } & Record<string, unknown>,
+): Record<string, unknown> {
+  const type = attachment.type ?? "unknown";
+  let subject: string | undefined;
+  let items: string[] = [];
+  let itemsLabel: string | undefined;
+  let body = "";
+
+  switch (type) {
+    case "total_tokens_reminder":
+      body = joinText(attachment.text);
+      break;
+    case "edited_text_file":
+      subject = attachment.filename as string;
+      body = joinText(attachment.snippet);
+      break;
+    case "file": {
+      subject = (attachment.displayPath as string) ?? (attachment.filename as string);
+      const content = attachment.content as Record<string, unknown> | undefined;
+      const file = content?.file as Record<string, unknown> | undefined;
+      body = joinText(file?.content ?? content);
+      break;
+    }
+    case "nested_memory": {
+      subject = (attachment.displayPath as string) ?? (attachment.path as string);
+      const content = attachment.content as Record<string, unknown> | undefined;
+      body = joinText(content?.content ?? content);
+      break;
+    }
+    case "hook_additional_context":
+      subject = attachment.hookName as string;
+      body = joinText(attachment.content);
+      break;
+    case "queued_command":
+      subject = attachment.commandMode as string;
+      body = joinText(attachment.prompt);
+      break;
+    case "task_reminder":
+      subject =
+        typeof attachment.itemCount === "number"
+          ? `${attachment.itemCount} item${attachment.itemCount === 1 ? "" : "s"}`
+          : undefined;
+      body = joinText(attachment.content);
+      break;
+    case "command_permissions":
+      items = toNames(attachment.allowedTools);
+      itemsLabel = "allowed";
+      break;
+    case "skill_listing":
+      items = toNames(attachment.names);
+      itemsLabel = "skills";
+      subject = attachment.isInitial ? "initial listing" : "updated";
+      body = joinText(attachment.content);
+      break;
+    case "agent_listing_delta":
+      items = toNames(attachment.addedTypes);
+      itemsLabel = "agents";
+      body = joinText(attachment.addedLines);
+      break;
+    case "mcp_instructions_delta":
+      items = toNames(attachment.addedNames);
+      itemsLabel = "servers";
+      body = joinText(attachment.addedBlocks);
+      break;
+    case "deferred_tools_delta": {
+      items = toNames(attachment.addedNames);
+      itemsLabel = "tools added";
+      const removed = toNames(attachment.removedNames).length;
+      subject = removed ? `${removed} removed` : undefined;
+      body = joinText(attachment.addedLines);
+      break;
+    }
+    case "auto_mode":
+      items = Object.entries(attachment)
+        .filter(([key, value]) => key !== "type" && value === true)
+        .map(([key]) => key);
+      itemsLabel = "flags";
+      break;
+    case "remote_session_change":
+      subject = (attachment.url as string) ?? undefined;
+      body = [attachment.commit, attachment.pr].filter(Boolean).map(String).join("\n");
+      break;
+    case "image":
+      break;
+    default:
+      body = joinText(attachment);
+  }
+
+  const capped = capText(body);
+  return {
+    attachmentType: type,
+    label: ATTACHMENT_LABELS[type] ?? type.replace(/_/g, " "),
+    subject,
+    items: items.slice(0, 200),
+    itemCount: items.length,
+    itemsLabel,
+    content: capped.text,
+    charLength: capped.chars,
+    truncated: capped.truncated,
+  };
+}
+
 interface ParsedSession {
   meta: SessionMeta;
   events: AgentEvent[];
@@ -175,19 +312,9 @@ function parseFile(filePath: string, projectDir: string): ParsedSession {
         }, rec.uuid, rec.parentUuid);
         continue;
 
-      case "attachment": {
-        const attachment = rec.attachment ?? {};
-        const { text, chars, truncated } = capText(
-          typeof attachment.content === "string" ? attachment.content : attachment,
-        );
-        push(ts, "context.attachment", {
-          attachmentType: attachment.type ?? "unknown",
-          charLength: chars,
-          truncated,
-          content: text,
-        }, rec.uuid, rec.parentUuid);
+      case "attachment":
+        push(ts, "context.attachment", describeAttachment(rec.attachment ?? {}), rec.uuid, rec.parentUuid);
         continue;
-      }
 
       case "system": {
         if (rec.subtype === "api_error") {
@@ -249,10 +376,7 @@ function parseFile(filePath: string, projectDir: string): ParsedSession {
               rec.parentUuid,
             );
           } else if (block.type === "image") {
-            push(ts, "context.attachment", {
-              attachmentType: "image",
-              charLength: 0,
-            }, rec.uuid, rec.parentUuid);
+            push(ts, "context.attachment", describeAttachment({ type: "image" }), rec.uuid, rec.parentUuid);
           }
         }
         continue;

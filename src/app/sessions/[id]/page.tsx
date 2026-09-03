@@ -108,7 +108,7 @@ export default function SessionPage({
     <div className="min-h-screen bg-background text-foreground">
       {/* Sticky bar: back, current session, tab navigation. */}
       <div className="sticky top-0 z-30 border-b border-border bg-background/85 backdrop-blur supports-[backdrop-filter]:bg-background/70">
-        <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-2 sm:px-6">
+        <div className="mx-auto flex h-[var(--cv-topbar-h)] max-w-6xl items-center gap-3 px-4 sm:px-6">
           <Link
             href="/"
             className="inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2 py-1 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring"

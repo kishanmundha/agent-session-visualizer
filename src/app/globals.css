@@ -85,9 +85,10 @@
   --radius: 0.625rem;
   color-scheme: light;
 
-  /* Heights of the stacked sticky layers on the session page, so the page
-     chrome and the timeline toolbar below it stay in sync. */
-  --cv-topbar-h: 45px;
+  /* Heights of the session page's stacked sticky layers. The tab strip sticks
+     under the top bar and the timeline toolbar under the tabs, so all three
+     read these rather than hard-coding numbers that can drift apart. */
+  --cv-topbar-h: 47px;
   --cv-tabbar-h: 48px;
 
   /* Brand accents. `brand` is the terracotta used for identity and active

@@ -38,214 +38,179 @@ interface Props {
   } | null;
 }
 
-// Each event type: icon + light/dark-aware color classes
+// Per event type: display label plus light/dark-aware colour classes.
 const EVENT_CONFIG: Record<string, {
-  icon: string;
   label: string;
   dotCls: string;      // circle dot
-  cardCls: string;     // card bg + border
   typeCls: string;     // type label text color
 }> = {
   "session.start": {
-    icon: "🚀", label: "Session Start",
+    label: "Session Start",
     dotCls: "bg-emerald-100 border-emerald-400 dark:bg-emerald-900/60 dark:border-emerald-700",
-    cardCls: "bg-emerald-50 border-emerald-200 dark:bg-emerald-950/40 dark:border-emerald-800",
     typeCls: "text-emerald-700 dark:text-emerald-400",
   },
   "session.shutdown": {
-    icon: "🛑", label: "Session Shutdown",
+    label: "Session Shutdown",
     dotCls: "bg-red-100 border-red-400 dark:bg-red-900/60 dark:border-red-700",
-    cardCls: "bg-red-50 border-red-200 dark:bg-red-950/40 dark:border-red-800",
     typeCls: "text-red-700 dark:text-red-400",
   },
   "session.resume": {
-    icon: "▶️", label: "Session Resume",
+    label: "Session Resume",
     dotCls: "bg-violet-100 border-violet-400 dark:bg-violet-900/60 dark:border-violet-700",
-    cardCls: "bg-violet-50 border-violet-200 dark:bg-violet-950/40 dark:border-violet-800",
     typeCls: "text-violet-700 dark:text-violet-400",
   },
   "user.message": {
-    icon: "💬", label: "User Message",
+    label: "User Message",
     dotCls: "bg-violet-100 border-violet-400 dark:bg-violet-900/60 dark:border-violet-700",
-    cardCls: "bg-violet-50 border-violet-200 dark:bg-violet-950/40 dark:border-violet-800",
     typeCls: "text-violet-700 dark:text-violet-400",
   },
   "assistant.message": {
-    icon: "🤖", label: "Assistant",
+    label: "Assistant",
     dotCls: "bg-sky-100 border-sky-400 dark:bg-sky-900/60 dark:border-sky-700",
-    cardCls: "bg-sky-50 border-sky-200 dark:bg-sky-950/40 dark:border-sky-800",
     typeCls: "text-sky-700 dark:text-sky-400",
   },
   "assistant.turn_start": {
-    icon: "▶️", label: "Turn Start",
+    label: "Turn Start",
     dotCls: "bg-cyan-100 border-cyan-400 dark:bg-cyan-900/60 dark:border-cyan-700",
-    cardCls: "bg-cyan-50 border-cyan-200 dark:bg-cyan-950/40 dark:border-cyan-800",
     typeCls: "text-cyan-700 dark:text-cyan-400",
   },
   "assistant.turn_end": {
-    icon: "🏁", label: "Turn End",
+    label: "Turn End",
     dotCls: "bg-cyan-100 border-cyan-400 dark:bg-cyan-900/60 dark:border-cyan-700",
-    cardCls: "bg-cyan-50 border-cyan-200 dark:bg-cyan-950/40 dark:border-cyan-800",
     typeCls: "text-cyan-700 dark:text-cyan-400",
   },
   "tool.execution_start": {
-    icon: "🔧", label: "Tool Start",
+    label: "Tool Start",
     dotCls: "bg-amber-100 border-amber-400 dark:bg-amber-900/60 dark:border-amber-700",
-    cardCls: "bg-amber-50 border-amber-200 dark:bg-amber-950/40 dark:border-amber-800",
     typeCls: "text-amber-700 dark:text-amber-400",
   },
   "tool.execution_complete": {
-    icon: "✅", label: "Tool Done",
+    label: "Tool Done",
     dotCls: "bg-amber-100 border-amber-400 dark:bg-amber-900/60 dark:border-amber-700",
-    cardCls: "bg-amber-50 border-amber-200 dark:bg-amber-950/40 dark:border-amber-800",
     typeCls: "text-amber-700 dark:text-amber-400",
   },
   "external_tool.requested": {
-    icon: "🌐", label: "External Tool Request",
+    label: "External Tool Request",
     dotCls: "bg-lime-100 border-lime-400 dark:bg-lime-900/60 dark:border-lime-700",
-    cardCls: "bg-lime-50 border-lime-200 dark:bg-lime-950/40 dark:border-lime-800",
     typeCls: "text-lime-700 dark:text-lime-400",
   },
   "external_tool.completed": {
-    icon: "✅", label: "External Tool Done",
+    label: "External Tool Done",
     dotCls: "bg-lime-100 border-lime-400 dark:bg-lime-900/60 dark:border-lime-700",
-    cardCls: "bg-lime-50 border-lime-200 dark:bg-lime-950/40 dark:border-lime-800",
     typeCls: "text-lime-700 dark:text-lime-400",
   },
   "permission.requested": {
-    icon: "🔐", label: "Permission",
+    label: "Permission",
     dotCls: "bg-orange-100 border-orange-400 dark:bg-orange-900/60 dark:border-orange-700",
-    cardCls: "bg-orange-50 border-orange-200 dark:bg-orange-950/40 dark:border-orange-800",
     typeCls: "text-orange-700 dark:text-orange-400",
   },
   "permission.completed": {
-    icon: "✔️", label: "Permission Done",
+    label: "Permission Done",
     dotCls: "bg-orange-100 border-orange-400 dark:bg-orange-900/60 dark:border-orange-700",
-    cardCls: "bg-orange-50 border-orange-200 dark:bg-orange-950/40 dark:border-orange-800",
     typeCls: "text-orange-700 dark:text-orange-400",
   },
   "hook.start": {
-    icon: "🪝", label: "Hook Start",
+    label: "Hook Start",
     dotCls: "bg-cyan-100 border-cyan-400 dark:bg-cyan-900/60 dark:border-cyan-700",
-    cardCls: "bg-cyan-50 border-cyan-200 dark:bg-cyan-950/40 dark:border-cyan-800",
     typeCls: "text-cyan-700 dark:text-cyan-400",
   },
   "hook.end": {
-    icon: "🏁", label: "Hook End",
+    label: "Hook End",
     dotCls: "bg-cyan-100 border-cyan-400 dark:bg-cyan-900/60 dark:border-cyan-700",
-    cardCls: "bg-cyan-50 border-cyan-200 dark:bg-cyan-950/40 dark:border-cyan-800",
     typeCls: "text-cyan-700 dark:text-cyan-400",
   },
   "session.auto_mode_resolved": {
-    icon: "🧠", label: "Auto Mode",
+    label: "Auto Mode",
     dotCls: "bg-fuchsia-100 border-fuchsia-400 dark:bg-fuchsia-900/60 dark:border-fuchsia-700",
-    cardCls: "bg-fuchsia-50 border-fuchsia-200 dark:bg-fuchsia-950/40 dark:border-fuchsia-800",
     typeCls: "text-fuchsia-700 dark:text-fuchsia-400",
   },
   "session.binary_asset": {
-    icon: "🖼️", label: "Binary Asset",
+    label: "Binary Asset",
     dotCls: "bg-rose-100 border-rose-400 dark:bg-rose-900/60 dark:border-rose-700",
-    cardCls: "bg-rose-50 border-rose-200 dark:bg-rose-950/40 dark:border-rose-800",
     typeCls: "text-rose-700 dark:text-rose-400",
   },
   "session.usage_checkpoint": {
-    icon: "📊", label: "Usage Checkpoint",
+    label: "Usage Checkpoint",
     dotCls: "bg-teal-100 border-teal-400 dark:bg-teal-900/60 dark:border-teal-700",
-    cardCls: "bg-teal-50 border-teal-200 dark:bg-teal-950/40 dark:border-teal-800",
     typeCls: "text-teal-700 dark:text-teal-400",
   },
   "subagent.deselected": {
-    icon: "🧵", label: "Subagent Deselected",
+    label: "Subagent Deselected",
     dotCls: "bg-slate-100 border-slate-400 dark:bg-slate-900/60 dark:border-slate-700",
-    cardCls: "bg-slate-50 border-slate-200 dark:bg-slate-950/40 dark:border-slate-800",
     typeCls: "text-slate-700 dark:text-slate-400",
   },
   "session.model_change": {
-    icon: "🔁", label: "Model Change",
+    label: "Model Change",
     dotCls: "bg-violet-100 border-violet-400 dark:bg-violet-900/60 dark:border-violet-700",
-    cardCls: "bg-violet-50 border-violet-200 dark:bg-violet-950/40 dark:border-violet-800",
     typeCls: "text-violet-700 dark:text-violet-400",
   },
   "session.compaction_start": {
-    icon: "🗜️", label: "Compaction Start",
+    label: "Compaction Start",
     dotCls: "bg-violet-100 border-violet-400 dark:bg-violet-900/60 dark:border-violet-700",
-    cardCls: "bg-violet-50 border-violet-200 dark:bg-violet-950/40 dark:border-violet-800",
     typeCls: "text-violet-700 dark:text-violet-400",
   },
   "session.compaction_complete": {
-    icon: "📦", label: "Compaction Complete",
+    label: "Compaction Complete",
     dotCls: "bg-purple-100 border-purple-400 dark:bg-purple-900/60 dark:border-purple-700",
-    cardCls: "bg-purple-50 border-purple-200 dark:bg-purple-950/40 dark:border-purple-800",
     typeCls: "text-purple-700 dark:text-purple-400",
   },
   "system.message": {
-    icon: "⚙️", label: "System",
+    label: "System",
     dotCls: "bg-slate-100 border-slate-400 dark:bg-slate-900/60 dark:border-slate-700",
-    cardCls: "bg-slate-50 border-slate-200 dark:bg-slate-950/40 dark:border-slate-800",
     typeCls: "text-slate-700 dark:text-slate-400",
   },
 };
 
 const DEFAULT_CONFIG = {
-  icon: "•", label: "Event",
+  label: "Event",
   dotCls: "bg-muted border-border",
-  cardCls: "bg-muted border-border",
   typeCls: "text-muted-foreground",
   chipCls: "border-border bg-muted text-muted-foreground",
 };
 
-const CATEGORY_VISUAL: Record<string, { dotCls: string; cardCls: string; typeCls: string; chipCls: string }> = {
+const CATEGORY_VISUAL: Record<string, { dotCls: string; typeCls: string; chipCls: string }> = {
   session: {
     dotCls: "bg-fuchsia-100 border-fuchsia-400 dark:bg-fuchsia-900/60 dark:border-fuchsia-700",
-    cardCls: "bg-fuchsia-50 border-fuchsia-200 dark:bg-fuchsia-950/40 dark:border-fuchsia-800",
     typeCls: "text-fuchsia-700 dark:text-fuchsia-400",
     chipCls: "border-fuchsia-300 bg-fuchsia-100 text-fuchsia-800 dark:border-fuchsia-800 dark:bg-fuchsia-900/50 dark:text-fuchsia-300",
   },
   user: {
     dotCls: "bg-pink-100 border-pink-400 dark:bg-pink-900/60 dark:border-pink-700",
-    cardCls: "bg-pink-50 border-pink-200 dark:bg-pink-950/40 dark:border-pink-800",
     typeCls: "text-pink-700 dark:text-pink-400",
     chipCls: "border-pink-300 bg-pink-100 text-pink-800 dark:border-pink-800 dark:bg-pink-900/50 dark:text-pink-300",
   },
   assistant: {
     dotCls: "bg-sky-100 border-sky-400 dark:bg-sky-900/60 dark:border-sky-700",
-    cardCls: "bg-sky-50 border-sky-200 dark:bg-sky-950/40 dark:border-sky-800",
     typeCls: "text-sky-700 dark:text-sky-400",
     chipCls: "border-sky-300 bg-sky-100 text-sky-800 dark:border-sky-800 dark:bg-sky-900/50 dark:text-sky-300",
   },
   tool: {
     dotCls: "bg-amber-100 border-amber-400 dark:bg-amber-900/60 dark:border-amber-700",
-    cardCls: "bg-amber-50 border-amber-200 dark:bg-amber-950/40 dark:border-amber-800",
     typeCls: "text-amber-700 dark:text-amber-400",
     chipCls: "border-amber-300 bg-amber-100 text-amber-800 dark:border-amber-800 dark:bg-amber-900/50 dark:text-amber-300",
   },
   external_tool: {
     dotCls: "bg-lime-100 border-lime-400 dark:bg-lime-900/60 dark:border-lime-700",
-    cardCls: "bg-lime-50 border-lime-200 dark:bg-lime-950/40 dark:border-lime-800",
     typeCls: "text-lime-700 dark:text-lime-400",
     chipCls: "border-lime-300 bg-lime-100 text-lime-800 dark:border-lime-800 dark:bg-lime-900/50 dark:text-lime-300",
   },
   permission: {
     dotCls: "bg-red-100 border-red-400 dark:bg-red-900/60 dark:border-red-700",
-    cardCls: "bg-red-50 border-red-200 dark:bg-red-950/40 dark:border-red-800",
     typeCls: "text-red-700 dark:text-red-400",
     chipCls: "border-red-300 bg-red-100 text-red-800 dark:border-red-800 dark:bg-red-900/50 dark:text-red-300",
   },
   hook: {
     dotCls: "bg-teal-100 border-teal-400 dark:bg-teal-900/60 dark:border-teal-700",
-    cardCls: "bg-teal-50 border-teal-200 dark:bg-teal-950/40 dark:border-teal-800",
     typeCls: "text-teal-700 dark:text-teal-400",
     chipCls: "border-teal-300 bg-teal-100 text-teal-800 dark:border-teal-800 dark:bg-teal-900/50 dark:text-teal-300",
   },
   system: {
     dotCls: "bg-slate-100 border-slate-400 dark:bg-slate-900/60 dark:border-slate-700",
-    cardCls: "bg-slate-50 border-slate-200 dark:bg-slate-950/40 dark:border-slate-800",
     typeCls: "text-slate-700 dark:text-slate-400",
     chipCls: "border-slate-300 bg-slate-100 text-slate-800 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-300",
   },
   subagent: {
     dotCls: "bg-zinc-100 border-zinc-400 dark:bg-zinc-900/60 dark:border-zinc-700",
-    cardCls: "bg-zinc-50 border-zinc-200 dark:bg-zinc-950/40 dark:border-zinc-800",
     typeCls: "text-zinc-700 dark:text-zinc-400",
     chipCls: "border-zinc-300 bg-zinc-100 text-zinc-800 dark:border-zinc-700 dark:bg-zinc-900/60 dark:text-zinc-300",
   },
@@ -1285,29 +1250,31 @@ function EventCard({
 
   const content = renderContent();
   const rawJson = JSON.stringify(event, null, 2);
-  const hasBody = Boolean(content);
+  // Every row is expandable: even without a rendered detail there is always the
+  // raw event and the row actions to show.
+  const hasDetail = Boolean(content);
 
   return (
-    <div className="group/event relative border-l-2 border-border pb-1 pl-6 last:border-l-transparent">
-      {/* Dot straddles the rail, as in the reference timeline. */}
+    <div className="relative border-l-2 border-border pb-1.5 pl-6 last:border-l-transparent">
+      {/* Small dot centred on the rail. */}
       <span
-        className={`absolute -left-[7px] top-2.5 size-3 rounded-full border-2 border-background ${visual.dotCls}`}
+        className={`absolute -left-[5px] top-3 size-2 rounded-full border border-background ${visual.dotCls}`}
         aria-hidden
       />
 
-      <div className="flex items-center gap-2 rounded-lg border border-border bg-card px-2.5 py-1.5 transition-colors hover:bg-muted/60">
+      {/* Header and detail share one container, so an expanded event reads as a
+          single object rather than two stacked cards. */}
+      <div className="overflow-hidden rounded-lg border border-border bg-card">
         <button
           type="button"
-          onClick={() => hasBody && setOpen(!open)}
-          aria-expanded={hasBody ? open : undefined}
-          disabled={!hasBody}
-          className="flex min-w-0 flex-1 items-center gap-2 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:cursor-default"
+          onClick={() => setOpen(!open)}
+          aria-expanded={open}
+          className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left transition-colors hover:bg-muted/60 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
         >
           <ChevronRight
             className={cn(
               "size-3.5 shrink-0 text-muted-foreground transition-transform",
               open && "rotate-90",
-              !hasBody && "opacity-0",
             )}
             aria-hidden
           />
@@ -1320,114 +1287,107 @@ function EventCard({
           <span className="min-w-0 flex-1 truncate text-xs text-foreground/90">
             {summary.preview}
           </span>
+
+          {tokenBadge && (
+            <span
+              className="hidden shrink-0 font-mono text-[11px] tabular-nums text-muted-foreground sm:inline"
+              title={`${tokenBadge.input.toLocaleString()} in · ${tokenBadge.output.toLocaleString()} out`}
+            >
+              {tokenBadge.input > 0 && `↓${formatCompactNumber(tokenBadge.input)}`}
+              {tokenBadge.input > 0 && tokenBadge.output > 0 && " "}
+              {tokenBadge.output > 0 && `↑${formatCompactNumber(tokenBadge.output)}`}
+            </span>
+          )}
+
+          {gap !== null && gap > 5000 && (
+            <span
+              className="hidden shrink-0 rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] tabular-nums text-muted-foreground sm:inline"
+              title="Gap since the previous event"
+            >
+              +{gap > 60000 ? `${(gap / 60000).toFixed(1)}m` : `${(gap / 1000).toFixed(1)}s`}
+            </span>
+          )}
+
+          {/* Timestamp is the row's right-hand anchor and never moves. */}
+          <span className="shrink-0 font-mono text-[11px] tabular-nums text-muted-foreground">
+            {formatTime(event.timestamp)}
+          </span>
         </button>
 
-        {tokenBadge && (
-          <Tooltip>
-            <TooltipTrigger
-              render={
-                <span className="hidden shrink-0 font-mono text-[11px] tabular-nums text-muted-foreground sm:inline">
-                  {tokenBadge.input > 0 && `↓${formatCompactNumber(tokenBadge.input)}`}
-                  {tokenBadge.input > 0 && tokenBadge.output > 0 && " "}
-                  {tokenBadge.output > 0 && `↑${formatCompactNumber(tokenBadge.output)}`}
-                </span>
-              }
-            />
-            <TooltipContent>
-              {tokenBadge.input.toLocaleString()} in · {tokenBadge.output.toLocaleString()} out
-            </TooltipContent>
-          </Tooltip>
+        {open && (
+          <div className="border-t border-border">
+            {hasDetail ? (
+              <div className="px-3 py-2.5">{content}</div>
+            ) : (
+              <p className="px-3 py-2.5 text-xs text-muted-foreground">
+                No structured detail for this event — see the raw event below.
+              </p>
+            )}
+
+            {/* Occasional actions live at the foot of the detail, out of the
+                scanning path of the collapsed rows. */}
+            <div className="flex items-center gap-1 border-t border-border bg-muted/30 px-2 py-1.5">
+              <span className="mr-auto truncate pl-1 font-mono text-[11px] text-muted-foreground">
+                {event.type}
+              </span>
+              <button
+                type="button"
+                onClick={() => setShowHelp(!showHelp)}
+                aria-expanded={showHelp}
+                className={cn(
+                  "inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-[11px] transition-colors",
+                  "focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring",
+                  showHelp
+                    ? "bg-muted text-foreground"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                )}
+              >
+                <Info className="size-3.5" aria-hidden />
+                About
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowRaw(!showRaw)}
+                aria-expanded={showRaw}
+                className={cn(
+                  "inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-[11px] transition-colors",
+                  "focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring",
+                  showRaw
+                    ? "bg-muted text-foreground"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                )}
+              >
+                <Braces className="size-3.5" aria-hidden />
+                {showRaw ? "Hide raw" : "Raw"}
+              </button>
+              <CopyButton value={rawJson} label="Copy raw JSON">
+                <span className="text-[11px]">Copy</span>
+              </CopyButton>
+            </div>
+
+            {/* Both panels open below the action bar, so toggling either one
+                never shifts the button that controls it. They are ordered to
+                match the buttons above them. */}
+            {showHelp && (
+              <div className="border-t border-border bg-muted/40 px-3 py-2 text-xs leading-relaxed text-muted-foreground">
+                {helpText}
+              </div>
+            )}
+
+            {/* Raw JSON supplements the rendered detail rather than replacing it. */}
+            {showRaw && (
+              <div className="border-t border-border px-3 py-2.5">
+                <p className="mb-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">
+                  Raw event
+                </p>
+                <pre className="max-h-64 max-w-full overflow-auto whitespace-pre-wrap break-words rounded-md border border-border bg-muted p-2.5 font-mono text-xs leading-relaxed text-foreground [overflow-wrap:anywhere]">
+                  {rawJson}
+                </pre>
+              </div>
+            )}
+          </div>
         )}
-
-        {gap !== null && gap > 5000 && (
-          <Tooltip>
-            <TooltipTrigger
-              render={
-                <span className="hidden shrink-0 rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] tabular-nums text-muted-foreground sm:inline">
-                  +{gap > 60000 ? `${(gap / 60000).toFixed(1)}m` : `${(gap / 1000).toFixed(1)}s`}
-                </span>
-              }
-            />
-            <TooltipContent>Gap since the previous event</TooltipContent>
-          </Tooltip>
-        )}
-
-        <span className="shrink-0 font-mono text-[11px] tabular-nums text-muted-foreground">
-          {formatTime(event.timestamp)}
-        </span>
-
-        {/* Row actions stay out of the way until the row is hovered or focused. */}
-        <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity focus-within:opacity-100 group-hover/event:opacity-100 max-sm:opacity-100">
-          <Tooltip>
-            <TooltipTrigger
-              render={
-                <button
-                  type="button"
-                  onClick={() => setShowHelp(!showHelp)}
-                  aria-expanded={showHelp}
-                  aria-label="Explain this event type"
-                  className={cn(
-                    "inline-flex size-6 items-center justify-center rounded-md transition-colors",
-                    "focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring",
-                    showHelp
-                      ? "bg-muted text-foreground"
-                      : "text-muted-foreground hover:bg-muted hover:text-foreground",
-                  )}
-                >
-                  <Info className="size-3.5" aria-hidden />
-                </button>
-              }
-            />
-            <TooltipContent>What is {event.type}?</TooltipContent>
-          </Tooltip>
-          <Tooltip>
-            <TooltipTrigger
-              render={
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowRaw(!showRaw);
-                    if (!showRaw) setOpen(true);
-                  }}
-                  aria-expanded={showRaw}
-                  aria-label="Toggle raw event JSON"
-                  className={cn(
-                    "inline-flex size-6 items-center justify-center rounded-md transition-colors",
-                    "focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring",
-                    showRaw
-                      ? "bg-muted text-foreground"
-                      : "text-muted-foreground hover:bg-muted hover:text-foreground",
-                  )}
-                >
-                  <Braces className="size-3.5" aria-hidden />
-                </button>
-              }
-            />
-            <TooltipContent>{showRaw ? "Hide raw JSON" : "Show raw JSON"}</TooltipContent>
-          </Tooltip>
-          <CopyButton value={rawJson} label="Copy raw JSON" className="size-6 justify-center p-0" />
-        </div>
       </div>
-
-      {showHelp && (
-        <div className="mt-1.5 rounded-lg border border-border bg-muted/40 px-2.5 py-2 text-xs leading-relaxed text-muted-foreground">
-          <span className="font-mono font-semibold text-foreground">{event.type}</span> — {helpText}
-        </div>
-      )}
-
-      {(open || showRaw) && (
-        <div className="mb-2 mt-1.5">
-          {showRaw ? (
-            <pre className="max-h-64 max-w-full overflow-auto whitespace-pre-wrap break-words rounded-lg border border-border bg-muted p-2.5 font-mono text-xs leading-relaxed text-foreground [overflow-wrap:anywhere]">
-              {rawJson}
-            </pre>
-          ) : content && cfg.cardCls ? (
-            <div className={`rounded-lg border p-3 ${visual.cardCls}`}>{content}</div>
-          ) : (
-            content
-          )}
-        </div>
-      )}
     </div>
   );
 }

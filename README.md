@@ -24,12 +24,18 @@ Each card shows turns, tool calls and tokens in/out at a glance.
 order, with per-step token counts. Expand any event to see its content, or open
 the raw record.
 
-![Event timeline showing user prompt, thinking, and Grep/Read tool calls](docs/screenshots/timeline.png)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/timeline-dark.png">
+  <img alt="Event timeline showing user prompt, thinking, and Grep/Read tool calls" src="docs/screenshots/timeline.png">
+</picture>
 
 **Token Optimizer.** Where the context went (system prompt vs. tool results vs.
 replies), which tools ran most, and hints for trimming expensive sessions.
 
-![Token Optimizer: context usage breakdown, tool usage and event type charts](docs/screenshots/token-optimizer.png)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/token-optimizer-dark.png">
+  <img alt="Token Optimizer: context usage breakdown, tool usage and event type charts" src="docs/screenshots/token-optimizer.png">
+</picture>
 
 > Screenshots use synthetic demo data. To reproduce them locally, see
 > [Demo data](#demo-data).
